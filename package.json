@@ -1,0 +1,43 @@
+{
+	"name": "diffmap",
+	"version": "0.0.1",
+	"description": "Image difference calculator",
+	"module": "dist/index.js",
+	"type": "module",
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"build": "tsc"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/achronos0/diffmap.git"
+	},
+	"keywords": [
+		"image",
+		"diff",
+		"bitmap",
+		"difference",
+		"equal"
+	],
+	"author": "Ky Patterson <ky@achronos.ca>",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/achronos0/diffmap/issues"
+	},
+	"homepage": "https://github.com/achronos0/diffmap#readme",
+	"peerDependencies": {
+		"sharp": "^0.33.0"
+	},
+	"peerDependenciesMeta": {
+		"sharp": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@types/node": "^20.10.2",
+		"sharp": "^0.33.0",
+		"tsx": "^4.6.2",
+		"typescript": "^5.3.2"
+	}
+}

@@ -34,7 +34,12 @@ import {
 /**
  * Diff flag names
  */
-export type DiffFlagName = 'diffNone' | 'diffDifferent' | 'diffGroup' | 'diffBorder'
+export type DiffFlagName = 'diffSame' | 'diffDifferent'
+
+/**
+ * Group flag names
+ */
+export type GroupFlagName = 'groupNone' | 'groupFill' | 'groupBorder'
 
 /**
  * Similarity flag names
@@ -49,16 +54,19 @@ export type SignificanceFlagName = 'antialias' | 'background' | 'foreground'
 /**
  * All possible flag names
  */
-export type FlagName = DiffFlagName | SimilarityFlagName | SignificanceFlagName
+export type FlagName = DiffFlagName | GroupFlagName | SimilarityFlagName | SignificanceFlagName
 
 /**
  * Flag bit values for each flag name
  *
  * Diff flags:
- * * `diffNone`: pixel is not part of a diff group
+ * * `diffSame`: pixel is not part of a diff group
  * * `diffDifferent`: pixel is a changed pixel
- * * `diffGroup`: pixel is part of a diff group interior
- * * `diffBorder`: pixel is part of a diff group border
+ *
+ * Group flags:
+ * * `groupNone`: pixel is not part of a diff group
+ * * `groupFill`: pixel is part of a diff group interior
+ * * `groupBorder`: pixel is part of a diff group border
  *
  * Similarity flags:
  * * `identical`: pixel is the same in all images
@@ -71,38 +79,41 @@ export type FlagName = DiffFlagName | SimilarityFlagName | SignificanceFlagName
  * * `antialias`: pixel is probably antialiasing
  *
  * Bit values:
- * * 0x00 - .....000 - diffNone
- * * 0x03 - .....011 - diffDifferent
- * * 0x02 - .....010 - diffGroup
- * * 0x06 - .....110 - diffBorder
- * * 0x07 - .....111 - diff mask
- * * 0x00 - ..00.... - identical
- * * 0x20 - ..10.... - similar
- * * 0x30 - ..11.... - changed
- * * 0x30 - ..11.... - similarity mask
- * * 0x00 - 00...... - background
- * * 0x40 - 01...... - foreground
- * * 0x80 - 10...... - antialias
- * * 0xC0 - 11...... - significance mask
+ * * 0x01 & 0x00 - .......0 - diffSame
+ * * 0x01 & 0x01 - .......1 - diffDifferent
+ * * 0x06 & 0x00 - .....00. - groupNone
+ * * 0x06 & 0x02 - .....01. - groupFill
+ * * 0x06 & 0x06 - .....11. - groupBorder
+ * * 0x30 & 0x00 - ..00.... - identical
+ * * 0x30 & 0x20 - ..10.... - similar
+ * * 0x30 & 0x30 - ..11.... - changed
+ * * 0xC0 & 0x00 - 00...... - background
+ * * 0xC0 & 0x40 - 01...... - foreground
+ * * 0xC0 & 0x80 - 10...... - antialias
  *
  */
 export const FLAGS: Record<FlagName, { value: number, mask: number }> = {
 	// Diff flags
-	diffNone: {
+	diffSame: {
 		value: 0x00,
-		mask: 0x07
+		mask: 0x01
 	},
 	diffDifferent: {
-		value: 0x03,
-		mask: 0x07
+		value: 0x01,
+		mask: 0x01
 	},
-	diffGroup: {
+	// Group flags
+	groupNone: {
+		value: 0x00,
+		mask: 0x06
+	},
+	groupFill: {
 		value: 0x02,
-		mask: 0x07
+		mask: 0x06
 	},
-	diffBorder: {
+	groupBorder: {
 		value: 0x06,
-		mask: 0x07,
+		mask: 0x06
 	},
 	// Similarity flags
 	identical: {
@@ -281,10 +292,11 @@ const DEFAULT_OPTIONS: Required<DiffOptions> = {
 	outputOptions: {},
 	outputPrograms: {
 		groups: {
-			inputs: ['changedFaded', 'flagsDiffPixels', 'flagsDiffGroups'],
+			inputs: ['changedFaded', 'flagsDiffGroups', 'flagsDiffPixels'],
 			fn: (maps) => {
-				const { changedFaded, flagsDiffGroups } = maps
-				return blend(changedFaded as RgbaBitmap, flagsDiffGroups as RgbaBitmap)
+				const { changedFaded, flagsDiffGroups, flagsDiffPixels } = maps
+				const o1 = blend(changedFaded as RgbaBitmap, flagsDiffGroups as RgbaBitmap)
+				return blend(o1, flagsDiffPixels as RgbaBitmap)
 			}
 		},
 		pixels: {
@@ -292,14 +304,6 @@ const DEFAULT_OPTIONS: Required<DiffOptions> = {
 			fn: (maps) => {
 				const { changedFaded, flagsDiffPixels } = maps
 				return blend(changedFaded as RgbaBitmap, flagsDiffPixels as RgbaBitmap)
-			}
-		},
-		flagsrgb: {
-			inputs: ['flagsDiffPixels', 'flagsDiffGroups', 'flagsSignificance'],
-			fn: (maps) => {
-				const { flagsDiffPixels, flagsDiffGroups, flagsSignificance } = maps
-				const r1 = blend(flagsSignificance as RgbaBitmap, flagsDiffPixels as RgbaBitmap)
-				return blend(r1, flagsDiffGroups as RgbaBitmap)
 			}
 		},
 		changedFaded: {
@@ -314,7 +318,7 @@ const DEFAULT_OPTIONS: Required<DiffOptions> = {
 		},
 		flagsDiffPixels: {
 			options: {
-				diffPixelColor: { r: 255, g: 128, b: 0, a: 255 },
+				diffPixelColor: { r: 255, g: 64, b: 0, a: 255 },
 			},
 			inputs: ['flags'],
 			fn: (maps, options) => {
@@ -347,17 +351,53 @@ const DEFAULT_OPTIONS: Required<DiffOptions> = {
 					palette: [
 						{
 							match: {
-								mask: FLAGS.diffBorder.mask,
-								value: FLAGS.diffBorder.value
+								mask: FLAGS.groupBorder.mask,
+								value: FLAGS.groupBorder.value
 							},
 							color: groupBorderColor
 						},
 						{
 							match: {
-								mask: FLAGS.diffGroup.mask,
-								value: FLAGS.diffGroup.value
+								mask: FLAGS.groupFill.mask,
+								value: FLAGS.groupFill.value
 							},
 							color: groupFillColor
+						}
+					]
+				})
+			}
+		},
+		flagsSimilarity: {
+			options: {
+				identicalColor: { r: 0, g: 0, b: 0, a: 255 },
+				similarColor: { r: 128, g: 128, b: 128, a: 255 },
+				changedColor: { r: 255, g: 255, b: 255, a: 255 }
+			},
+			inputs: ['flags'],
+			fn: (maps, options) => {
+				const {
+					identicalColor,
+					similarColor,
+					changedColor
+				} = options
+				return valuesToRgb(maps.flags as IntValuemap, {
+					palette: [
+						{
+							match: {
+								mask: FLAGS.changed.mask,
+								value: FLAGS.changed.value
+							},
+							color: changedColor
+						},
+						{
+							match: {
+								mask: FLAGS.similar.mask,
+								value: FLAGS.similar.value
+							},
+							color: similarColor
+						},
+						{
+							color: identicalColor
 						}
 					]
 				})
@@ -921,7 +961,7 @@ export function groups (config: {
 	let groups: AbsBox[] = []
 	flagsImage.iterateAll(({ x: currentX, y: currentY, offset }) => {
 		const flags = flagsImage.pixel(offset)
-		if ((flags & diffFlagValue) === diffFlagValue) {
+		if ((flags & diffFlagValue) !== diffFlagValue) {
 			return
 		}
 
@@ -1009,8 +1049,8 @@ export function groups (config: {
 					y > group.bottom - groupBorderSize ||
 					x < group.left + groupBorderSize ||
 					x > group.right - groupBorderSize
-						? FLAGS.diffBorder.value
-						: FLAGS.diffGroup.value
+						? FLAGS.groupBorder.value
+						: FLAGS.groupFill.value
 				const offset = flagsImage.offset(x, y)
 				let pixel = flagsImage.pixel(offset)
 				pixel |= flag
@@ -1053,7 +1093,7 @@ function render (config: {
 	const allMaps: RenderOutputMapCollection = {
 		flags: flagsImage,
 		original: sourceImages[0],
-		changed: sourceImages[1]
+		changed: sourceImages[sourceImages.length - 1]
 	}
 	const generateMap = (name: string): RenderOutputMap => {
 		if (allMaps[name]) {

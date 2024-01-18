@@ -8,6 +8,7 @@ export type RenderValuesMatch = (number | {
     value: number | number[];
 } | {
     mask: number;
+    value: number;
 } | {
     range: [number, number];
 });

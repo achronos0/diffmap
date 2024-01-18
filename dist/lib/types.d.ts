@@ -393,3 +393,7 @@ export type IntValuemap = Valuemap<IntRawPixels>;
  * An in-memory single-channel image with floating-point values for each pixel
  */
 export type FloatValuemap = Valuemap<FloatRawPixels>;
+/**
+ * An in-memory single-channel image (bitmap or floatmap)
+ */
+export type AnyValuemap = IntValuemap | FloatValuemap;

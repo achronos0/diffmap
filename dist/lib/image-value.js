@@ -27,13 +27,14 @@ export function rgb(sourceImage, options = {}) {
                 };
             }
             if ('value' in match) {
+                if ('mask' in match) {
+                    return {
+                        mask: match.mask,
+                        value: match.value
+                    };
+                }
                 return {
                     value: Array.isArray(match.value) ? match.value : [match.value]
-                };
-            }
-            if ('mask' in match) {
-                return {
-                    mask: match.mask
                 };
             }
             if ('range' in match) {
@@ -68,15 +69,15 @@ export function rgb(sourceImage, options = {}) {
             // Check if pixel matches instruction
             let foundMatch = false;
             for (const match of instruction.match) {
-                if (match.value != null) {
-                    if (match.value.includes(pixel)) {
+                if (match.mask != null) {
+                    if ((pixel & match.mask) === match.value) {
                         foundMatch = true;
                         break;
                     }
                     continue;
                 }
-                if (match.mask != null) {
-                    if ((pixel & match.mask) === match.mask) {
+                if (match.value != null) {
+                    if (match.value.includes(pixel)) {
                         foundMatch = true;
                         break;
                     }

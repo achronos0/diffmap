@@ -2,7 +2,7 @@
 import * as diffmap from '../sharp.js'
 
 const testNum = 1
-const diffOutputs: string[] = ['flagsSignificance']
+const diffOutputs: string[] = ['pixels', 'groups', 'flagsDiffGroups', 'flagsDiffPixels', 'flagsSimilarity', 'flagsSignificance']
 const diffOptions: diffmap.diff.DiffOptions = {
 	// diffIncludeAntialias: true,
 	// diffIncludeBackground: true

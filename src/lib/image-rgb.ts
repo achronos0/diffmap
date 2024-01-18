@@ -169,7 +169,7 @@ export interface BlendOptions {
  * @param options blend options
  * @returns blended RGB image
  */
-export function blend (sourceImage: RgbaBitmap, blendImage: RgbaBitmap, options: BlendOptions = {}): RgbBitmap {
+export function blend (sourceImage: AnyRgbBitmap, blendImage: AnyRgbBitmap, options: BlendOptions = {}): RgbBitmap {
 	const {
 		mode = 'average',
 		channels = ['r', 'g', 'b']
@@ -180,7 +180,8 @@ export function blend (sourceImage: RgbaBitmap, blendImage: RgbaBitmap, options:
 	const resultImage = RgbBitmap.create(sourceImage.width, sourceImage.height)
 	sourceImage.iterateAll(({ index, offset }) => {
 		const originalPixel = sourceImage.pixel(offset)
-		const newPixel = blendImage.pixel(offset)
+		const newOffset = blendImage.offsetFromIndex(index)
+		const newPixel = blendImage.pixel(newOffset)
 		const resultPixel = blendPixel(originalPixel, newPixel, mode, channels)
 		const resultOffset = resultImage.offsetFromIndex(index)
 		resultImage.setPixel(resultOffset, resultPixel)

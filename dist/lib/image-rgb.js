@@ -90,7 +90,8 @@ export function blend(sourceImage, blendImage, options = {}) {
     const resultImage = RgbBitmap.create(sourceImage.width, sourceImage.height);
     sourceImage.iterateAll(({ index, offset }) => {
         const originalPixel = sourceImage.pixel(offset);
-        const newPixel = blendImage.pixel(offset);
+        const newOffset = blendImage.offsetFromIndex(index);
+        const newPixel = blendImage.pixel(newOffset);
         const resultPixel = blendPixel(originalPixel, newPixel, mode, channels);
         const resultOffset = resultImage.offsetFromIndex(index);
         resultImage.setPixel(resultOffset, resultPixel);

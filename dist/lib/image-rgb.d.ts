@@ -104,4 +104,4 @@ export interface BlendOptions {
  * @param options blend options
  * @returns blended RGB image
  */
-export declare function blend(sourceImage: RgbaBitmap, blendImage: RgbaBitmap, options?: BlendOptions): RgbBitmap;
+export declare function blend(sourceImage: AnyRgbBitmap, blendImage: AnyRgbBitmap, options?: BlendOptions): RgbBitmap;

@@ -4,7 +4,7 @@
  * @module
  */
 import sharp from 'sharp';
-import { rgb, rgbMultiple } from './diff.js';
+import { diff } from './diff.js';
 import { RgbBitmap, RgbaBitmap } from './types.js';
 /**
  * Generate image diff from file
@@ -15,30 +15,15 @@ import { RgbBitmap, RgbaBitmap } from './types.js';
  * @param options diff options
  * @returns diff result stats
  */
-export async function diffFile(sourceImagePath, originalImagePath, diffOutputPath, options = {}) {
-    const sourceImage = await loadImageFromFile(sourceImagePath);
-    const originalImage = await loadImageFromFile(originalImagePath);
-    const diffResult = rgb(sourceImage, originalImage, options);
-    const diffImage = diffResult.resultImage;
-    await saveImageToFile(diffOutputPath, diffImage);
-    return diffResult;
-}
-/**
- * Generate image diff from file in multiple formats
- *
- * @param sourceImagePath file path of image to generate diff for
- * @param originalImagePath file path of image to compare against
- * @param diffOutputPaths output images to generate; keys are output program names, values are file paths
- * @param options diff options
- * @returns diff result stats
- */
-export async function diffFileMultiple(sourceImagePath, originalImagePath, diffOutputPaths, options = {}) {
-    const sourceImage = await loadImageFromFile(sourceImagePath);
-    const originalImage = await loadImageFromFile(originalImagePath);
-    const outputNames = Object.keys(diffOutputPaths);
-    const { resultImages, ...result } = rgbMultiple(sourceImage, originalImage, outputNames, options);
+export async function diffFile(sourceImagePaths, diffOutputPaths, options = {}) {
+    const sourceImages = await Promise.all(sourceImagePaths.map(loadImageFromFile));
+    const finalOptions = {
+        ...options,
+        output: Object.keys(diffOutputPaths)
+    };
+    const { outputImages, ...diffResult } = diff(sourceImages, finalOptions);
     for (const [key, path] of Object.entries(diffOutputPaths)) {
-        const image = resultImages[key];
+        const image = outputImages[key];
         if (!image) {
             throw new Error('diff image not generated');
         }
@@ -47,7 +32,7 @@ export async function diffFileMultiple(sourceImagePath, originalImagePath, diffO
         }
         await saveImageToFile(path, image);
     }
-    return result;
+    return diffResult;
 }
 /**
  * Load diffmap image from file using {@link https://www.npmjs.com/package/sharp sharp} library

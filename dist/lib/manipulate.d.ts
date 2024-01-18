@@ -47,7 +47,7 @@ export interface GreyscaleOptions {
     alphaRatio?: number;
 }
 /**
- * Convert RGBA image to greyscale
+ * Convert RGBA image to brightness valuemap (greyscale)
  *
  * @param sourceImage image to convert to greyscale
  * @param alphaRatio alpha channel multiplier; apply this ratio to reduce pixel alpha (lighten image)
@@ -79,12 +79,12 @@ export interface BlendOptions {
 /**
  * Blend (premultiply) RGBA image with another RGBA image
  *
- * @param originalImage image to blend into
- * @param newImage image to blend into original image
+ * @param sourceImage image to blend into
+ * @param blendImage image to blend into original image
  * @param options blend options
  * @returns blended RGB image
  */
-export declare function blend(originalImage: RgbaImage, newImage: RgbaImage, options?: BlendOptions): RgbImage;
+export declare function blend(sourceImage: RgbaImage, blendImage: RgbaImage, options?: BlendOptions): RgbImage;
 export type RenderValuesMatch = (number | {
     value: number | number[];
 } | {

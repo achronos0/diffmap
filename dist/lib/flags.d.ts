@@ -1,10 +1,10 @@
 /**
- * Image generation functions
+ * flags image (significance/diff/groups) generation functions
  *
  * @module
  */
 import { AbsBox } from './box.js';
-import { Intmap, Floatmap, RgbImage, RgbaImage, YiqImage } from './image.js';
+import { AnyRgbBitmap, IntValuemap, FloatValuemap, YiqFloatmap } from './types.js';
 /**
  * Category flag for pixel significance: is foreground, i.e. important content
  */
@@ -44,11 +44,11 @@ export interface SignificanceOptions {
     /**
      * Valuemap to store max colour distance for each pixel (compared to surrounding pixels)
      */
-    maxDistanceImage?: Floatmap;
+    maxDistanceImage?: FloatValuemap;
     /**
      * Valuemap to store max contrast for each pixel (compared to surrounding pixels)
      */
-    maxContrastImage?: Floatmap;
+    maxContrastImage?: FloatValuemap;
     /**
      * Minimum colour distance for a pixel to be considered antialiasing
      *
@@ -115,12 +115,12 @@ export interface SignificanceResult {
  *
  * Optionally also generate max colour distance and max contrast maps.
  *
- * @param sourceImage YIQ image to generate stats from
  * @param flagsImage valuemap to store pixel category flags
+ * @param sourceImage YIQ image to generate stats from
  * @param options generation options
  * @returns pixel category stats
  */
-export declare function significance(sourceImage: YiqImage, flagsImage: Intmap, options?: SignificanceOptions): SignificanceResult;
+export declare function significance(flagsImage: IntValuemap, sourceImage: YiqFloatmap, options?: SignificanceOptions): SignificanceResult;
 /**
  * Options for {@link diffPixels}
  */
@@ -174,13 +174,13 @@ export interface DiffPixelsResult {
 /**
  * Generate image diff from two YIQ images
  *
+ * @param flagsImage valuemap to store pixel category flags of changed image
  * @param sourceImage YIQ image to generate diff for
  * @param originalImage YIQ image to compare against
- * @param flagsImage valuemap to store pixel category flags of changed image
  * @param options generation options
  * @returns diff pixel stats
  */
-export declare function diffPixels(sourceImage: YiqImage, originalImage: YiqImage, flagsImage: Intmap, options?: DiffPixelsOptions): DiffPixelsResult;
+export declare function diffPixels(flagsImage: IntValuemap, sourceImage: YiqFloatmap, originalImage: YiqFloatmap, options?: DiffPixelsOptions): DiffPixelsResult;
 /**
  * Options for {@link diffGroups}
  */
@@ -236,7 +236,7 @@ export interface DiffGroupsResult {
  * @param options generation options
  * @returns diff group stats
  */
-export declare function diffGroups(flagsImage: Intmap, options?: DiffGroupsOptions): DiffGroupsResult;
+export declare function diffGroups(flagsImage: IntValuemap, options?: DiffGroupsOptions): DiffGroupsResult;
 /**
  * Options for {@link diffStats}
  */
@@ -295,91 +295,49 @@ export interface DiffStatsResult {
  * @param options generation options
  * @returns overall diff stats
  */
-export declare function diffStats(flagsImage: Intmap, diffPixelsResult: DiffPixelsResult, diffGroupsResult: DiffGroupsResult, options: DiffStatsOptions): DiffStatsResult;
+export declare function diffStats(flagsImage: IntValuemap, diffPixelsResult: DiffPixelsResult, diffGroupsResult: DiffGroupsResult, options: DiffStatsOptions): DiffStatsResult;
 /**
- * Image generation instruction for {@link output}
+ * Generated image from {@link render}
  */
-export interface OutputInstruction {
-    output: string;
-    op: string;
-    input: string;
-    blendInput?: string;
+export type RenderOutputMap = FloatValuemap | IntValuemap | AnyRgbBitmap;
+/**
+ * Map of generated images from {@link render}
+ */
+export type RenderOutputMapCollection = Record<string, RenderOutputMap>;
+/**
+ * Render program for {@link render}
+ */
+export interface RenderProgram {
     options?: Record<string, any>;
+    inputs: string[];
+    fn: (maps: RenderOutputMapCollection, options: Record<string, any>) => RenderOutputMap;
 }
 /**
- * Image generation program for {@link output}
+ * Options for {@link render}
  */
-export interface OutputProgram {
-    defaultOptions?: Record<string, any>;
-    steps: OutputInstruction[];
-    layers: string[];
-}
-/**
- * Generated image from {@link output}
- */
-export type OutputMap = Floatmap | Intmap | RgbImage | RgbaImage;
-/**
- * Map of generated images from {@link output}
- */
-export type OutputMapCollection = Record<string, OutputMap>;
-/**
- * Options for {@link output}
- */
-export interface OutputOptions {
+export interface RenderOptions {
     /**
-     * Preset name or output instructions
-     *
-     * Default: {@link DEFAULT_OUTPUT_NAME}
-     */
-    output?: string | OutputProgram;
-    /**
-     * Output preset instructions
-     */
-    presets?: Record<string, OutputProgram>;
-    /**
-     * If provided, object is populated with generated maps
-     *
-     * Pre-populated maps are used as inputs for output instructions, and generated maps are added to the object.
-     */
-    maps?: OutputMapCollection;
-    /**
-     * Options used by output instructions
+     * Options for output programs
      */
     outputOptions?: Record<string, any>;
+    /**
+     * Instructions for generating output images
+     *
+     * Default: {@link DEFAULT_RENDER_PROGRAMS}
+     */
+    programs?: Record<string, RenderProgram>;
 }
 /**
- * Default output preset name for {@link output}
+ * Default named render programs for {@link render}
  */
-export declare const DEFAULT_OUTPUT_NAME = "groups";
-/**
- * Default output preset programs for {@link output}
- */
-export declare const DEFAULT_OUTPUT_PRESETS: Record<string, OutputProgram>;
+export declare const DEFAULT_RENDER_PROGRAMS: Record<string, RenderProgram>;
 /**
  *
+ * @param flagsImage valuemap of pixel category flags
  * @param changedImage image to generate diff for
  * @param originalImage image to compare against
- * @param flagsImage valuemap of pixel category flags
+ * @param outputs output images to generate; each value is the name of an output program
  * @param options output options
- * @returns output image and generated data
+ * @returns generated output images
  */
-export declare function output(changedImage: RgbImage | RgbaImage, originalImage: RgbImage | RgbaImage, flagsImage: Intmap, options?: OutputOptions): RgbImage | RgbaImage;
-/**
- * Options for {@link diff}
- */
-export type DiffOptions = (OutputOptions & DiffStatsOptions & DiffPixelsOptions & DiffGroupsOptions & SignificanceOptions);
-/**
- * Return value of {@link diff}
- */
-export type DiffResult = ({
-    resultImage: RgbImage | RgbaImage;
-} & DiffStatsResult & DiffPixelsResult & DiffGroupsResult & SignificanceResult);
-/**
- * Generate image diff
- *
- * @param sourceImage image to generate diff for
- * @param originalImage image to compare against
- * @param options diff options
- * @returns
- */
-export declare function diff(sourceImage: RgbImage | RgbaImage, originalImage: RgbImage | RgbaImage, options?: DiffOptions): DiffResult;
+export declare function render(flagsImage: IntValuemap, changedImage: AnyRgbBitmap, originalImage: AnyRgbBitmap, outputs: string[], options?: RenderOptions): RenderOutputMapCollection;

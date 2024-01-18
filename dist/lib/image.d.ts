@@ -120,6 +120,13 @@ export declare abstract class Image<RawPixels extends AnyRawPixels, PixelColor e
      */
     xyFromOffset(offset: number): Point;
     /**
+     * Return array offset of pixel into bitmap from index
+     *
+     * @param index index of pixel into bitmap
+     * @returns array offset of pixel into bitmap
+     */
+    offsetFromIndex(index: number): number;
+    /**
      * Create a copy of this bitmap
      *
      * @returns new Bitmap object

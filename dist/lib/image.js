@@ -87,6 +87,15 @@ export class Image {
         return this.xyFromIndex(offset / this.channels);
     }
     /**
+     * Return array offset of pixel into bitmap from index
+     *
+     * @param index index of pixel into bitmap
+     * @returns array offset of pixel into bitmap
+     */
+    offsetFromIndex(index) {
+        return index * this.channels;
+    }
+    /**
      * Create a copy of this bitmap
      *
      * @returns new Bitmap object
@@ -129,7 +138,7 @@ export class Image {
                     image: this
                 };
                 if (fn(data)) {
-                    return offset;
+                    return index + 1;
                 }
                 index++;
                 offset += this.channels;

@@ -1,5 +1,5 @@
 /**
- * Image generation functions
+ * flags image (significance/diff/groups) generation functions
  *
  * @module
  */
@@ -10,24 +10,23 @@ import {
 	fitBox
 } from './box.js'
 import {
-	Intmap,
-	Floatmap,
-	RgbImage,
-	RgbaImage,
-	Valuemap,
-	YiqImage
-} from './image.js'
-import {
 	blend,
-	flatten,
-	greyscale,
-	renderValues,
-	yiq
-} from './manipulate.js'
+	greyscale
+} from './image-rgb.js'
+import {
+	rgb as valuesToRgb
+} from './image-value.js'
 import {
 	colorDistance,
 	contrast
 } from './pixel-yiq.js'
+import {
+	AnyRgbBitmap,
+	IntValuemap,
+	FloatValuemap,
+	RgbaBitmap,
+	YiqFloatmap
+} from './types.js'
 
 /**
  * Category flag for pixel significance: is foreground, i.e. important content
@@ -69,11 +68,11 @@ export interface SignificanceOptions {
 	/**
 	 * Valuemap to store max colour distance for each pixel (compared to surrounding pixels)
 	 */
-	maxDistanceImage?: Floatmap
+	maxDistanceImage?: FloatValuemap
 	/**
 	 * Valuemap to store max contrast for each pixel (compared to surrounding pixels)
 	 */
-	maxContrastImage?: Floatmap
+	maxContrastImage?: FloatValuemap
 	/**
 	 * Minimum colour distance for a pixel to be considered antialiasing
 	 *
@@ -145,12 +144,12 @@ export interface SignificanceResult {
  *
  * Optionally also generate max colour distance and max contrast maps.
  *
- * @param sourceImage YIQ image to generate stats from
  * @param flagsImage valuemap to store pixel category flags
+ * @param sourceImage YIQ image to generate stats from
  * @param options generation options
  * @returns pixel category stats
  */
-export function significance (sourceImage: YiqImage, flagsImage: Intmap, options: SignificanceOptions = {}): SignificanceResult {
+export function significance (flagsImage: IntValuemap, sourceImage: YiqFloatmap, options: SignificanceOptions = {}): SignificanceResult {
 	const {
 		maxDistanceImage = null,
 		maxContrastImage = null,
@@ -172,9 +171,9 @@ export function significance (sourceImage: YiqImage, flagsImage: Intmap, options
 		countPixelsBackground: 0,
 		countPixelsForeground: 0
 	}
-	sourceImage.iterateAll(({ offset, x, y }) => {
-		const pixel = sourceImage.pixel(offset)
-		let flags = flagsImage.pixel(offset)
+	sourceImage.iterateAll(({ index, offset, x, y }) => {
+		const sourcePixel = sourceImage.pixel(offset)
+		let flags = flagsImage.pixel(index)
 
 		// Calc pixel stats
 		let maxDistance = 0
@@ -182,12 +181,12 @@ export function significance (sourceImage: YiqImage, flagsImage: Intmap, options
 		let countEqual = 0
 		sourceImage.iterateAdjacent(x, y, ({ offset: adjacentOffset }) => {
 			const adjacentPixel = sourceImage.pixel(adjacentOffset)
-			const calcDistance = Math.abs(colorDistance(pixel, adjacentPixel))
+			const calcDistance = Math.abs(colorDistance(sourcePixel, adjacentPixel))
 			if (calcDistance) {
 				if (calcDistance > maxDistance) {
 					maxDistance = calcDistance
 				}
-				const calcContrast = Math.abs(contrast(pixel, adjacentPixel))
+				const calcContrast = Math.abs(contrast(sourcePixel, adjacentPixel))
 				if (calcContrast > maxContrast) {
 					maxContrast = calcContrast
 				}
@@ -228,7 +227,7 @@ export function significance (sourceImage: YiqImage, flagsImage: Intmap, options
 			flags |= FLAG_SGN_FOREGROUND
 		}
 
-		flagsImage.setPixel(offset, flags)
+		flagsImage.setPixel(index, flags)
 	})
 	return results
 }
@@ -250,13 +249,13 @@ export interface DiffPixelsOptions {
 	 *
 	 * By default, antialias pixels are ignored.
 	 */
-	includeAntialias?: boolean
+	diffAntialias?: boolean
 	/**
 	 * Calculate diff for background pixels
 	 *
 	 * By default, background pixels are ignored.
 	 */
-	includeBackground?: boolean
+	diffBackground?: boolean
 }
 
 /**
@@ -289,22 +288,22 @@ export interface DiffPixelsResult {
 /**
  * Generate image diff from two YIQ images
  *
- * @param changedImage YIQ image to generate diff for
- * @param originalImage YIQ image to compare against
  * @param flagsImage valuemap to store pixel category flags of changed image
+ * @param sourceImage YIQ image to generate diff for
+ * @param originalImage YIQ image to compare against
  * @param options generation options
  * @returns diff pixel stats
  */
-export function diffPixels (changedImage: YiqImage, originalImage: YiqImage, flagsImage: Intmap, options: DiffPixelsOptions = {}): DiffPixelsResult {
-	if (originalImage.width !== changedImage.width || originalImage.height !== changedImage.height) {
+export function diffPixels (flagsImage: IntValuemap, sourceImage: YiqFloatmap, originalImage: YiqFloatmap, options: DiffPixelsOptions = {}): DiffPixelsResult {
+	if (originalImage.width !== sourceImage.width || originalImage.height !== sourceImage.height) {
 		throw new Error('changedImage is not the same size as changedImage')
 	}
 	const {
 		diffMinDistance = DEFAULT_DIFF_MIN_DISTANCE,
-		includeAntialias = false,
-		includeBackground = false
+		diffAntialias = false,
+		diffBackground = false
 	} = options
-	if (flagsImage.width !== changedImage.width || flagsImage.height !== changedImage.height) {
+	if (flagsImage.width !== sourceImage.width || flagsImage.height !== sourceImage.height) {
 		throw new Error('flagsImage is not the same size as changedImage')
 	}
 	const results: DiffPixelsResult = {
@@ -313,17 +312,17 @@ export function diffPixels (changedImage: YiqImage, originalImage: YiqImage, fla
 		countPixelsSimilar: 0,
 		countPixelsDifferent: 0
 	}
-	changedImage.iterateAll(({ offset }) => {
-		let flags = flagsImage.pixel(offset)
+	sourceImage.iterateAll(({ index, offset }) => {
+		let flags = flagsImage.pixel(index)
 		if (
-			((flags & FLAG_SGN_ANTIALIAS) && !includeAntialias) ||
-			((flags & FLAG_SGN_BACKGROUND) && !includeBackground)
+			((flags & FLAG_SGN_ANTIALIAS) && !diffAntialias) ||
+			((flags & FLAG_SGN_BACKGROUND) && !diffBackground)
 		) {
 			return
 		}
-		const pixel = changedImage.pixel(offset)
+		const sourcePixel = sourceImage.pixel(offset)
 		const originalPixel = originalImage.pixel(offset)
-		const calcDistance = Math.abs(colorDistance(pixel, originalPixel))
+		const calcDistance = Math.abs(colorDistance(sourcePixel, originalPixel))
 		results.countPixelsCompared++
 		if (calcDistance) {
 			if (calcDistance >= diffMinDistance) {
@@ -339,7 +338,7 @@ export function diffPixels (changedImage: YiqImage, originalImage: YiqImage, fla
 			results.countPixelsIdentical++
 			flags |= FLAG_DIFF_IDENTICAL
 		}
-		flagsImage.setPixel(offset, flags)
+		flagsImage.setPixel(index, flags)
 	})
 	return results
 }
@@ -390,7 +389,7 @@ export interface DiffGroupsResult {
 	/**
 	 * Diff groups
 	 */
-	groups: AbsBox[],
+	diffGroups: AbsBox[],
 	/**
 	 * Number of pixels in image that are part of a diff group
 	 */
@@ -404,7 +403,7 @@ export interface DiffGroupsResult {
  * @param options generation options
  * @returns diff group stats
  */
-export function diffGroups (flagsImage: Intmap, options: DiffGroupsOptions = {}): DiffGroupsResult {
+export function diffGroups (flagsImage: IntValuemap, options: DiffGroupsOptions = {}): DiffGroupsResult {
 	const {
 		groupMergeMaxGapSize = DEFAULT_GROUP_MERGE_MAX_GAP_SIZE,
 		groupBorderSize = DEFAULT_DIFF_GROUP_BORDER_SIZE,
@@ -515,7 +514,7 @@ export function diffGroups (flagsImage: Intmap, options: DiffGroupsOptions = {})
 	}
 
 	return {
-		groups,
+		diffGroups: groups,
 		countPixelsDiffGroup
 	}
 }
@@ -542,6 +541,11 @@ export interface DiffStatsOptions {
 export const DEFAULT_MISMATCH_MIN_PERCENT = 50
 
 /**
+ * Overall result of diff comparison
+ */
+export type DiffStatus = 'identical' | 'similar' | 'different' | 'mismatch'
+
+/**
  * Return value of {@link diffStats}
  */
 export interface DiffStatsResult {
@@ -553,7 +557,7 @@ export interface DiffStatsResult {
 	 * * `different`: images are notably different
 	 * * `mismatch`: images are so different that they are probably not based on the same image
 	 */
-	diffStatus: 'identical' | 'similar' | 'different' | 'mismatch'
+	diffStatus: DiffStatus
 	/**
 	 * Total number of pixels in image
 	 */
@@ -578,7 +582,7 @@ export interface DiffStatsResult {
  * @returns overall diff stats
  */
 export function diffStats (
-	flagsImage: Intmap,
+	flagsImage: IntValuemap,
 	diffPixelsResult: DiffPixelsResult,
 	diffGroupsResult: DiffGroupsResult,
 	options: DiffStatsOptions
@@ -598,7 +602,7 @@ export function diffStats (
 	const percentDiffPixels = countPixelsDifferent / countPixelsCompared * 100
 	const percentDiffGroup = countPixelsDiffGroup / countPixelsAll * 100
 
-	let diffStatus: DiffStatsResult['diffStatus']
+	let diffStatus: DiffStatus
 	if (countPixelsDifferent) {
 		if (percentDiffPixels >= mismatchMinPercent) {
 			diffStatus = 'mismatch'
@@ -626,281 +630,208 @@ export function diffStats (
 }
 
 /**
- * Image generation instruction for {@link output}
+ * Generated image from {@link render}
  */
-export interface OutputInstruction {
-	output: string,
-	op: string,
-	source: string,
-	source2?: string,
-	options?: Record<string, any>
-}
+export type RenderOutputMap = FloatValuemap | IntValuemap | AnyRgbBitmap
 
-export interface OutputProgram {
-	defaultOptions?: Record<string, any>
-	steps: OutputInstruction[]
-	layers: string[]
+/**
+ * Map of generated images from {@link render}
+ */
+export type RenderOutputMapCollection = Record<string, RenderOutputMap>
+
+/**
+ * Render program for {@link render}
+ */
+export interface RenderProgram {
+	options?: Record<string, any>
+	inputs: string[]
+	fn: (maps: RenderOutputMapCollection, options: Record<string, any>) => RenderOutputMap
 }
 
 /**
- * Options for {@link output}
+ * Options for {@link render}
  */
-export interface OutputOptions {
+export interface RenderOptions {
 	/**
-	 * Preset name or output instructions
-	 */
-	output?: string | OutputProgram
-	/**
-	 * Output preset instructions
-	 */
-	presets?: Record<string, OutputProgram>
-	/**
-	 * If provided, object is populated with generated maps
-	 *
-	 * Pre-populated maps are used as inputs for output instructions, and generated maps are added to the object.
-	 */
-	maps?: Record<string, Floatmap | Intmap | RgbImage | RgbaImage>
-	/**
-	 * Options used by output instructions
+	 * Options for output programs
 	 */
 	outputOptions?: Record<string, any>
+	/**
+	 * Instructions for generating output images
+	 *
+	 * Default: {@link DEFAULT_RENDER_PROGRAMS}
+	 */
+	programs?: Record<string, RenderProgram>
 }
 
 /**
- * Default output presets for {@link output}
+ * Default named render programs for {@link render}
  */
-export const DEFAULT_OUTPUT_PRESETS: Record<string, OutputProgram> = {
-	greyscale: {
-		defaultOptions: {
-			fade: 0.2
+export const DEFAULT_RENDER_PROGRAMS: Record<string, RenderProgram> = {
+	groups: {
+		inputs: ['changedFaded', 'flagsDiffPixels', 'flagsDiffGroups'],
+		fn: (maps) => {
+			const { changedFaded, flagsDiffGroups } = maps
+			return blend(changedFaded as RgbaBitmap, flagsDiffGroups as RgbaBitmap)
+		}
+	},
+	pixels: {
+		inputs: ['changedFaded', 'flagsDiffPixels'],
+		fn: (maps) => {
+			const { changedFaded, flagsDiffPixels } = maps
+			return blend(changedFaded as RgbaBitmap, flagsDiffPixels as RgbaBitmap)
+		}
+	},
+	flagsrgb: {
+		inputs: ['flagsDiffPixels', 'flagsDiffGroups', 'flagsSignificance'],
+		fn: (maps) => {
+			const { flagsDiffPixels, flagsDiffGroups, flagsSignificance } = maps
+			const r1 = blend(flagsSignificance as RgbaBitmap, flagsDiffPixels as RgbaBitmap)
+			return blend(r1, flagsDiffGroups as RgbaBitmap)
+		}
+	},
+	changedFaded: {
+		options: {
+			fade: 0.5
 		},
-		steps: [
-			{
-				output: 'greyscaleValues',
-				op: 'greyscale',
-				source: 'changed',
-				options: {
-					alphaRatio: '@@fade'
-				},
-			},
-			{
-				output: 'greyscaleImage',
-				op: 'renderValues',
-				source: 'greyscaleValues',
-			},
-			{
-				output: 'diffGroups',
-				op: 'renderValues',
-				source: 'flags',
-				options: {
-					palette: [
-						{
-							match: {
-								mask: FLAG_GROUP_BORDER
-							},
-							color: { r: 255, g: 0, b: 0, a: 255 }
+		inputs: ['changed'],
+		fn: (maps, options) => {
+			const { fade } = options
+			return greyscale(maps.changed as RgbaBitmap, { fade })
+		},
+	},
+	flagsDiffPixels: {
+		options: {
+			diffPixelColor: { r: 255, g: 128, b: 0, a: 255 },
+		},
+		inputs: ['flags'],
+		fn: (maps, options) => {
+			const { diffPixelColor } = options
+			return valuesToRgb(maps.flags as IntValuemap, {
+				palette: [
+					{
+						match: {
+							mask: FLAG_DIFF_DIFFERENT,
+							value: FLAG_DIFF_DIFFERENT
 						},
-						{
-							match: {
-								mask: FLAG_GROUP_FILL
-							},
-							color: { r: 255, g: 0, b: 255, a: 128 }
+						color: diffPixelColor
+					}
+				]
+			})
+		}
+	},
+	flagsDiffGroups: {
+		options: {
+			groupBorderColor: { r: 255, g: 0, b: 0, a: 255 },
+			groupFillColor: { r: 255, g: 0, b: 255, a: 128 }
+		},
+		inputs: ['flags'],
+		fn: (maps, options) => {
+			const {
+				groupBorderColor,
+				groupFillColor
+			} = options
+			return valuesToRgb(maps.flags as IntValuemap, {
+				palette: [
+					{
+						match: {
+							mask: FLAG_GROUP_BORDER,
+							value: FLAG_GROUP_BORDER
 						},
-					]
-				}
-			}
-		],
-		layers: ['greyscaleImage', 'diffGroups']
-	}
+						color: groupBorderColor
+					},
+					{
+						match: {
+							mask: FLAG_GROUP_FILL,
+							value: FLAG_GROUP_FILL
+						},
+						color: groupFillColor
+					}
+				]
+			})
+		}
+	},
+	flagsSignificance: {
+		options: {
+			antialiasColor: { r: 0, g: 0, b: 128, a: 255 },
+			backgroundColor: { r: 0, g: 0, b: 0, a: 255 },
+			foregroundColor: { r: 255, g: 255, b: 255, a: 255 }
+		},
+		inputs: ['flags'],
+		fn: (maps, options) => {
+			const {
+				antialiasColor,
+				backgroundColor,
+				foregroundColor
+			} = options
+			return valuesToRgb(maps.flags as IntValuemap, {
+				palette: [
+					{
+						match: {
+							mask: FLAG_SGN_ANTIALIAS,
+							value: FLAG_SGN_ANTIALIAS
+						},
+						color: antialiasColor
+					},
+					{
+						match: {
+							mask: FLAG_SGN_BACKGROUND,
+							value: FLAG_SGN_BACKGROUND
+						},
+						color: backgroundColor
+					},
+					{
+						color: foregroundColor
+					}
+				]
+			})
+		}
+	},
 }
 
 /**
  *
- * @param changedImage image to generate diff for
- * @param originalImage image to compare against
  * @param flagsImage valuemap of pixel category flags
- * @param options output options
- * @returns output image and generated data
- */
-export function output (
-	changedImage: RgbImage | RgbaImage,
-	originalImage: RgbImage | RgbaImage,
-	flagsImage: Intmap,
-	options: OutputOptions = {}
-): RgbImage | RgbaImage {
-	let {
-		output = 'greyscale',
-		presets = DEFAULT_OUTPUT_PRESETS,
-		maps = {},
-		outputOptions = {}
-	} = options
-
-	// Determine output program
-	let program: OutputProgram
-	if (typeof output === 'string') {
-		if (!presets[output]) {
-			throw new Error(`Invalid output preset: ${output}`)
-		}
-		program = presets[output]
-	}
-	else {
-		program = output
-	}
-
-	// Apply program default options
-	outputOptions = Object.assign({}, program.defaultOptions, outputOptions)
-
-	// Assemble starting maps
-	maps.changed = changedImage
-	maps.original = originalImage
-	maps.flags = flagsImage
-
-	// Process each output instruction
-	for (const instruction of program.steps) {
-		const {
-			output,
-			op,
-			source,
-			source2 = null,
-			options: instructionOptions = {}
-		} = instruction
-
-		// Map is already generated, skip
-		if (maps[output]) {
-			continue
-		}
-
-		// Lookup source image
-		if (!maps[source]) {
-			throw new Error(`Missing source image: ${source}`)
-		}
-		const sourceImage = maps[source]
-
-		// Finalize instruction options
-		for (const key in instructionOptions) {
-			const value = instructionOptions[key]
-			if (typeof value === 'string' && value.startsWith('@@')) {
-				const optionKey = value.slice(2)
-				if (!outputOptions[optionKey]) {
-					throw new Error(`Missing option: ${optionKey}`)
-				}
-				instructionOptions[key] = outputOptions[optionKey]
-			}
-		}
-
-		// Generate result image
-		let result: Floatmap | Intmap | RgbImage | RgbaImage
-		switch (op) {
-			case 'flatten': {
-				if (!(sourceImage instanceof RgbaImage)) {
-					throw new Error('flatten source image must be RGBA')
-				}
-				result = flatten(sourceImage, instructionOptions)
-				break
-			}
-			case 'greyscale': {
-				if (!(sourceImage instanceof RgbImage || sourceImage instanceof RgbaImage)) {
-					throw new Error('greyscale source image must be RGB/RGBA')
-				}
-				result = greyscale(sourceImage, instructionOptions)
-				break
-			}
-			case 'renderValues': {
-				if (!(sourceImage instanceof Valuemap)) {
-					throw new Error('renderValues source image must be valuemap')
-				}
-				result = renderValues(sourceImage, instructionOptions)
-				break
-			}
-			case 'blend': {
-				if (!source2) {
-					throw new Error('Missing source2 for blend')
-				}
-				const source2Image = maps[source2]
-				if (!source2Image) {
-					throw new Error(`Missing source2 image for blend: ${source2}`)
-				}
-				if (!(sourceImage instanceof RgbImage || sourceImage instanceof RgbaImage)) {
-					throw new Error('greyscale source image must be RGB/RGBA')
-				}
-				if (!(source2Image instanceof RgbImage || source2Image instanceof RgbaImage)) {
-					throw new Error('greyscale source2 image must be RGB/RGBA')
-				}
-				result = blend(sourceImage, source2Image, instructionOptions)
-				break
-			}
-			default: {
-				throw new Error(`Invalid output operation: ${op}`)
-			}
-		}
-		maps[output] = result
-	}
-
-	// Composite layers to generate final output image
-	if (!program.layers.length) {
-		throw new Error('No output layers')
-	}
-	const layers = program.layers.map(layer => {
-		const image = maps[layer]
-		if (!(image instanceof RgbImage || image instanceof RgbaImage)) {
-			throw new Error(`Invalid output image: ${layer}`)
-		}
-		return image
-	})
-	let resultImage: RgbImage | RgbaImage = layers.shift() as RgbImage | RgbaImage
-	while (layers.length) {
-		const layer = layers.shift() as RgbImage | RgbaImage
-		resultImage = blend(resultImage, layer)
-	}
-
-	return resultImage
-}
-
-/**
- * Options for {@link diff}
- */
-export type DiffOptions = (
-	OutputOptions &
-	DiffStatsOptions &
-	DiffPixelsOptions &
-	DiffGroupsOptions &
-	SignificanceOptions
-)
-
-/**
- * Return value of {@link diff}
- */
-export type DiffResult = (
-	{
-		resultImage: RgbImage | RgbaImage
-	} &
-	DiffStatsResult &
-	DiffPixelsResult &
-	DiffGroupsResult &
-	SignificanceResult
-)
-
-/**
- * Generate image diff
- *
  * @param changedImage image to generate diff for
  * @param originalImage image to compare against
- * @param options diff options
- * @returns
+ * @param outputs output images to generate; each value is the name of an output program
+ * @param options output options
+ * @returns generated output images
  */
-export function diff (
-	changedImage: RgbImage | RgbaImage,
-	originalImage: RgbImage | RgbaImage,
-	options: DiffOptions = {}
-): DiffResult {
-	const yiqChanged = yiq(changedImage)
-	const yiqOriginal = yiq(originalImage)
-	const flags = Valuemap.createIntmap(yiqChanged.width, yiqChanged.height)
-	const significanceResult = significance(yiqChanged, flags, options)
-	const diffPixelsResult = diffPixels(yiqChanged, yiqOriginal, flags, options)
-	const diffGroupsResult = diffGroups(flags, options)
-	const diffStatsResult = diffStats(flags, diffPixelsResult, diffGroupsResult, options)
-	const resultImage = output(changedImage, originalImage, flags, options)
-	const result: DiffResult = Object.assign({ resultImage }, diffStatsResult, diffPixelsResult, diffGroupsResult, significanceResult)
-	return result
+export function render (
+	flagsImage: IntValuemap,
+	changedImage: AnyRgbBitmap,
+	originalImage: AnyRgbBitmap,
+	outputs: string[],
+	options: RenderOptions = {}
+): RenderOutputMapCollection {
+	const {
+		outputOptions = {},
+		programs = DEFAULT_RENDER_PROGRAMS
+	} = options
+	const allMaps: RenderOutputMapCollection = {
+		changed: changedImage,
+		original: originalImage,
+		flags: flagsImage
+	}
+	const generateMap = (name: string): RenderOutputMap => {
+		if (allMaps[name]) {
+			return allMaps[name]
+		}
+		const program = programs[name]
+		if (!program) {
+			throw new Error(`Missing program: ${name}`)
+		}
+		for (const input of program.inputs) {
+			generateMap(input)
+		}
+		const result = program.fn(allMaps, { ...program.options, ...outputOptions })
+		allMaps[name] = result
+		return result
+	}
+	const outputMaps: RenderOutputMapCollection = {}
+	for (const outputName of outputs) {
+		outputMaps[outputName] = generateMap(outputName)
+	}
+	return outputMaps
 }

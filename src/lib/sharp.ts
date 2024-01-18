@@ -5,25 +5,43 @@
  */
 
 import sharp from 'sharp'
-import { DiffResult, diff } from './generate.js'
-import { RgbImage, RgbaImage } from './image.js'
+import {
+	DiffOptions,
+	DiffResult,
+	diff
+} from './diff.js'
+import { RgbBitmap, RgbaBitmap } from './types.js'
 
 /**
+ * Generate image diff from file
  *
- * @param changedImage file path of image to generate diff for
- * @param originalPath file path of image to compare against
- * @param diffPath file path to save diff image to
- * @returns
+ * @param sourceImagePath file path of image to generate diff for
+ * @param originalImagePath file path of image to compare against
+ * @param diffOutputPath file path to save diff image to
+ * @param options diff options
+ * @returns diff result stats
  */
-export async function diffFile (changedImage: string, originalPath: string, diffPath: string): Promise<DiffResult> {
-	const originalImage = await loadImageFromFile(originalPath)
-	const modifiedImage = await loadImageFromFile(changedImage)
-	const diffResult = diff(originalImage, modifiedImage)
-	const diffImage = diffResult.resultImage
-	if (!diffImage) {
-		throw new Error('diff image not generated')
+export async function diffFile (
+	sourceImagePaths: string[],
+	diffOutputPaths: Record<string, string>,
+	options: Omit<DiffOptions, 'output'> = {}
+): Promise<Omit<DiffResult, 'outputImages'>> {
+	const sourceImages = await Promise.all(sourceImagePaths.map(loadImageFromFile))
+	const finalOptions: DiffOptions = {
+		...options,
+		output: Object.keys(diffOutputPaths)
 	}
-	await saveImageToFile(diffPath, diffImage)
+	const {outputImages, ...diffResult} = diff(sourceImages, finalOptions)
+	for (const [key, path] of Object.entries(diffOutputPaths)) {
+		const image = outputImages[key]
+		if (!image) {
+			throw new Error('diff image not generated')
+		}
+		if (!(image instanceof RgbBitmap || image instanceof RgbaBitmap)) {
+			throw new Error('unsupported image type')
+		}
+		await saveImageToFile(path, image)
+	}
 	return diffResult
 }
 
@@ -33,7 +51,7 @@ export async function diffFile (changedImage: string, originalPath: string, diff
  * @param path image file path
  * @returns loaded image data
  */
-export async function loadImageFromFile (path: string): Promise<RgbaImage | RgbImage> {
+export async function loadImageFromFile (path: string): Promise<RgbaBitmap | RgbBitmap> {
 	const sharpImage = sharp(path)
 	return await sharpToImage(sharpImage)
 }
@@ -44,7 +62,7 @@ export async function loadImageFromFile (path: string): Promise<RgbaImage | RgbI
  * @param path image file path
  * @param image image data
  */
-export async function saveImageToFile (path: string, image: RgbaImage | RgbImage): Promise<void> {
+export async function saveImageToFile (path: string, image: RgbaBitmap | RgbBitmap): Promise<void> {
 	const sharpImage = imageToSharp(image)
 	await sharpImage.toFile(path)
 }
@@ -55,17 +73,17 @@ export async function saveImageToFile (path: string, image: RgbaImage | RgbImage
  * @param sharpImage sharp image object
  * @returns loaded image data
  */
-export async function sharpToImage (sharpImage: sharp.Sharp): Promise<RgbaImage | RgbImage> {
+export async function sharpToImage (sharpImage: sharp.Sharp): Promise<RgbaBitmap | RgbBitmap> {
 	const { width, height, channels } = await sharpImage.metadata()
 	if (!width || !height || !channels) {
 		throw new Error('cannot load image metadata')
 	}
-	const pixels = await sharpImage.raw().toBuffer()
+	const pixels = new Uint8Array((await sharpImage.raw().toBuffer()).buffer)
 	switch (channels) {
 		case 3:
-			return new RgbImage({ pixels, width, height })
+			return new RgbBitmap({ pixels, width, height })
 		case 4:
-			return new RgbaImage({ pixels, width, height })
+			return new RgbaBitmap({ pixels, width, height })
 		default:
 			throw new Error('unsupported image channels')
 	}
@@ -77,7 +95,7 @@ export async function sharpToImage (sharpImage: sharp.Sharp): Promise<RgbaImage 
  * @param image image data
  * @returns sharp object
  */
-export function imageToSharp (image: RgbaImage | RgbImage): sharp.Sharp {
+export function imageToSharp (image: RgbaBitmap | RgbBitmap): sharp.Sharp {
 	const { width, height, channels, pixels } = image
 	const sharpImage = sharp(pixels, { raw: { width, height, channels } })
 	return sharpImage

@@ -1,11 +1,11 @@
 /**
- * Image generation functions
+ * flags image (significance/diff/groups) generation functions
  *
  * @module
  */
 import { boxIntersect, fitBox } from './box.js';
-import { RgbImage, RgbaImage, Valuemap } from './image.js';
-import { blend, flatten, greyscale, renderValues, yiq } from './manipulate.js';
+import { blend, greyscale } from './image-rgb.js';
+import { rgb as valuesToRgb } from './image-value.js';
 import { colorDistance, contrast } from './pixel-yiq.js';
 /**
  * Category flag for pixel significance: is foreground, i.e. important content
@@ -56,12 +56,12 @@ export const DEFAULT_BACKGROUND_MAX_CONTRAST = 25;
  *
  * Optionally also generate max colour distance and max contrast maps.
  *
- * @param sourceImage YIQ image to generate stats from
  * @param flagsImage valuemap to store pixel category flags
+ * @param sourceImage YIQ image to generate stats from
  * @param options generation options
  * @returns pixel category stats
  */
-export function significance(sourceImage, flagsImage, options = {}) {
+export function significance(flagsImage, sourceImage, options = {}) {
     const { maxDistanceImage = null, maxContrastImage = null, antialiasMinDistance = DEFAULT_ANTIALIAS_MIN_DISTANCE, antialiasMaxDistance = DEFAULT_ANTIALIAS_MAX_DISTANCE, backgroundMaxContrast = DEFAULT_BACKGROUND_MAX_CONTRAST } = options;
     if (flagsImage.width !== sourceImage.width || flagsImage.height !== sourceImage.height) {
         throw new Error('flagsImage is not the same size as sourceImage');
@@ -138,13 +138,13 @@ export const DEFAULT_DIFF_MIN_DISTANCE = 40;
 /**
  * Generate image diff from two YIQ images
  *
+ * @param flagsImage valuemap to store pixel category flags of changed image
  * @param sourceImage YIQ image to generate diff for
  * @param originalImage YIQ image to compare against
- * @param flagsImage valuemap to store pixel category flags of changed image
  * @param options generation options
  * @returns diff pixel stats
  */
-export function diffPixels(sourceImage, originalImage, flagsImage, options = {}) {
+export function diffPixels(flagsImage, sourceImage, originalImage, options = {}) {
     if (originalImage.width !== sourceImage.width || originalImage.height !== sourceImage.height) {
         throw new Error('changedImage is not the same size as changedImage');
     }
@@ -353,231 +353,154 @@ export function diffStats(flagsImage, diffPixelsResult, diffGroupsResult, option
     return results;
 }
 /**
- * Default output preset name for {@link output}
+ * Default named render programs for {@link render}
  */
-export const DEFAULT_OUTPUT_NAME = 'groups';
-/**
- * Default output preset programs for {@link output}
- */
-export const DEFAULT_OUTPUT_PRESETS = {
+export const DEFAULT_RENDER_PROGRAMS = {
     groups: {
-        defaultOptions: {
-            fade: 0.5
-        },
-        steps: [
-            {
-                input: 'changed',
-                op: 'greyscale',
-                options: {
-                    alphaRatio: '@@fade'
-                },
-                output: 'changedGreyValues'
-            },
-            {
-                input: 'changedGreyValues',
-                op: 'renderValues',
-                output: 'changedGrey'
-            },
-            {
-                input: 'flags',
-                op: 'renderValues',
-                options: {
-                    palette: [
-                        {
-                            match: {
-                                mask: FLAG_DIFF_DIFFERENT
-                            },
-                            color: { r: 255, g: 128, b: 0, a: 255 }
-                        },
-                        {
-                            match: {
-                                mask: FLAG_GROUP_BORDER
-                            },
-                            color: { r: 255, g: 0, b: 0, a: 255 }
-                        },
-                        {
-                            match: {
-                                mask: FLAG_GROUP_FILL
-                            },
-                            color: { r: 255, g: 0, b: 255, a: 128 }
-                        }
-                    ]
-                },
-                output: 'groups'
-            }
-        ],
-        layers: ['changedGrey', 'groups']
+        inputs: ['changedFaded', 'flagsDiffPixels', 'flagsDiffGroups'],
+        fn: (maps) => {
+            const { changedFaded, flagsDiffGroups } = maps;
+            return blend(changedFaded, flagsDiffGroups);
+        }
     },
     pixels: {
-        defaultOptions: {
+        inputs: ['changedFaded', 'flagsDiffPixels'],
+        fn: (maps) => {
+            const { changedFaded, flagsDiffPixels } = maps;
+            return blend(changedFaded, flagsDiffPixels);
+        }
+    },
+    flagsrgb: {
+        inputs: ['flagsDiffPixels', 'flagsDiffGroups', 'flagsSignificance'],
+        fn: (maps) => {
+            const { flagsDiffPixels, flagsDiffGroups, flagsSignificance } = maps;
+            const r1 = blend(flagsSignificance, flagsDiffPixels);
+            return blend(r1, flagsDiffGroups);
+        }
+    },
+    changedFaded: {
+        options: {
             fade: 0.5
         },
-        steps: [
-            {
-                input: 'changed',
-                op: 'greyscale',
-                options: {
-                    alphaRatio: '@@fade'
-                },
-                output: 'changedGreyValues'
-            },
-            {
-                input: 'changedGreyValues',
-                op: 'renderValues',
-                output: 'changedGrey'
-            },
-            {
-                input: 'flags',
-                op: 'renderValues',
-                options: {
-                    palette: [
-                        {
-                            match: {
-                                mask: FLAG_DIFF_DIFFERENT
-                            },
-                            color: { r: 255, g: 0, b: 0, a: 255 }
-                        }
-                    ]
-                },
-                output: 'diff'
-            }
-        ],
-        layers: ['changedGrey', 'diff']
-    }
+        inputs: ['changed'],
+        fn: (maps, options) => {
+            const { fade } = options;
+            return greyscale(maps.changed, { fade });
+        },
+    },
+    flagsDiffPixels: {
+        options: {
+            diffPixelColor: { r: 255, g: 128, b: 0, a: 255 },
+        },
+        inputs: ['flags'],
+        fn: (maps, options) => {
+            const { diffPixelColor } = options;
+            return valuesToRgb(maps.flags, {
+                palette: [
+                    {
+                        match: {
+                            mask: FLAG_DIFF_DIFFERENT
+                        },
+                        color: diffPixelColor
+                    }
+                ]
+            });
+        }
+    },
+    flagsDiffGroups: {
+        options: {
+            groupBorderColor: { r: 255, g: 0, b: 0, a: 255 },
+            groupFillColor: { r: 255, g: 0, b: 255, a: 128 }
+        },
+        inputs: ['flags'],
+        fn: (maps, options) => {
+            const { groupBorderColor, groupFillColor } = options;
+            return valuesToRgb(maps.flags, {
+                palette: [
+                    {
+                        match: {
+                            mask: FLAG_GROUP_BORDER
+                        },
+                        color: groupBorderColor
+                    },
+                    {
+                        match: {
+                            mask: FLAG_GROUP_FILL
+                        },
+                        color: groupFillColor
+                    }
+                ]
+            });
+        }
+    },
+    flagsSignificance: {
+        options: {
+            antialiasColor: { r: 0, g: 0, b: 128, a: 255 },
+            backgroundColor: { r: 0, g: 0, b: 0, a: 255 },
+            foregroundColor: { r: 255, g: 255, b: 255, a: 255 }
+        },
+        inputs: ['flags'],
+        fn: (maps, options) => {
+            const { antialiasColor, backgroundColor, foregroundColor } = options;
+            return valuesToRgb(maps.flags, {
+                palette: [
+                    {
+                        match: {
+                            mask: FLAG_SGN_ANTIALIAS
+                        },
+                        color: antialiasColor
+                    },
+                    {
+                        match: {
+                            mask: FLAG_SGN_BACKGROUND
+                        },
+                        color: backgroundColor
+                    },
+                    {
+                        match: {
+                            mask: FLAG_SGN_FOREGROUND
+                        },
+                        color: foregroundColor
+                    }
+                ]
+            });
+        }
+    },
 };
 /**
  *
+ * @param flagsImage valuemap of pixel category flags
  * @param changedImage image to generate diff for
  * @param originalImage image to compare against
- * @param flagsImage valuemap of pixel category flags
+ * @param outputs output images to generate; each value is the name of an output program
  * @param options output options
- * @returns output image and generated data
+ * @returns generated output images
  */
-export function output(changedImage, originalImage, flagsImage, options = {}) {
-    let { output = DEFAULT_OUTPUT_NAME, presets = DEFAULT_OUTPUT_PRESETS, maps = {}, outputOptions = {} } = options;
-    // Determine output program
-    let program;
-    if (typeof output === 'string') {
-        if (!presets[output]) {
-            throw new Error(`Invalid output preset: ${output}`);
+export function render(flagsImage, changedImage, originalImage, outputs, options = {}) {
+    const { outputOptions = {}, programs = DEFAULT_RENDER_PROGRAMS } = options;
+    const allMaps = {
+        changed: changedImage,
+        original: originalImage,
+        flags: flagsImage
+    };
+    const generateMap = (name) => {
+        if (allMaps[name]) {
+            return allMaps[name];
         }
-        program = presets[output];
+        const program = programs[name];
+        if (!program) {
+            throw new Error(`Missing program: ${name}`);
+        }
+        for (const input of program.inputs) {
+            generateMap(input);
+        }
+        const result = program.fn(allMaps, { ...program.options, ...outputOptions });
+        allMaps[name] = result;
+        return result;
+    };
+    const outputMaps = {};
+    for (const outputName of outputs) {
+        outputMaps[outputName] = generateMap(outputName);
     }
-    else {
-        program = output;
-    }
-    // Apply program default options
-    outputOptions = Object.assign({}, program.defaultOptions, outputOptions);
-    // Assemble starting maps
-    maps.changed = changedImage;
-    maps.original = originalImage;
-    maps.flags = flagsImage;
-    // Process each output instruction
-    for (const instruction of program.steps) {
-        const { output, op, input, blendInput = null, options: instructionOptions = {} } = instruction;
-        // Map is already generated, skip
-        if (maps[output]) {
-            continue;
-        }
-        // Lookup source image
-        if (!maps[input]) {
-            throw new Error(`Missing source image: ${input}`);
-        }
-        const inputImage = maps[input];
-        // Finalize instruction options
-        for (const key in instructionOptions) {
-            const value = instructionOptions[key];
-            if (typeof value === 'string' && value.startsWith('@@')) {
-                const optionKey = value.slice(2);
-                if (!outputOptions[optionKey]) {
-                    throw new Error(`Missing option: ${optionKey}`);
-                }
-                instructionOptions[key] = outputOptions[optionKey];
-            }
-        }
-        // Generate result image
-        let result;
-        switch (op) {
-            case 'flatten': {
-                if (!(inputImage instanceof RgbaImage)) {
-                    throw new Error('flatten source image must be RGBA');
-                }
-                result = flatten(inputImage, instructionOptions);
-                break;
-            }
-            case 'greyscale': {
-                if (!(inputImage instanceof RgbImage || inputImage instanceof RgbaImage)) {
-                    throw new Error('greyscale source image must be RGB/RGBA');
-                }
-                result = greyscale(inputImage, instructionOptions);
-                break;
-            }
-            case 'renderValues': {
-                if (!(inputImage instanceof Valuemap)) {
-                    throw new Error('renderValues source image must be valuemap');
-                }
-                result = renderValues(inputImage, instructionOptions);
-                break;
-            }
-            case 'blend': {
-                if (!blendInput) {
-                    throw new Error('Missing source2 for blend');
-                }
-                const blendImage = maps[blendInput];
-                if (!blendImage) {
-                    throw new Error(`Missing source2 image for blend: ${blendInput}`);
-                }
-                if (!(inputImage instanceof RgbImage || inputImage instanceof RgbaImage)) {
-                    throw new Error('greyscale source image must be RGB/RGBA');
-                }
-                if (!(blendImage instanceof RgbImage || blendImage instanceof RgbaImage)) {
-                    throw new Error('greyscale source2 image must be RGB/RGBA');
-                }
-                result = blend(inputImage, blendImage, instructionOptions);
-                break;
-            }
-            default: {
-                throw new Error(`Invalid output operation: ${op}`);
-            }
-        }
-        maps[output] = result;
-    }
-    // Composite layers to generate final output image
-    if (!program.layers.length) {
-        throw new Error('No output layers');
-    }
-    const layers = program.layers.map(layer => {
-        const image = maps[layer];
-        if (!(image instanceof RgbImage || image instanceof RgbaImage)) {
-            throw new Error(`Invalid output image: ${layer}`);
-        }
-        return image;
-    });
-    let resultImage = layers.shift();
-    while (layers.length) {
-        const layer = layers.shift();
-        resultImage = blend(resultImage, layer);
-    }
-    maps.result = resultImage;
-    return resultImage;
-}
-/**
- * Generate image diff
- *
- * @param sourceImage image to generate diff for
- * @param originalImage image to compare against
- * @param options diff options
- * @returns
- */
-export function diff(sourceImage, originalImage, options = {}) {
-    const yiqSourceImage = yiq(sourceImage);
-    const yiqOriginalImage = yiq(originalImage);
-    const flagsImage = Valuemap.createIntmap(yiqSourceImage.width, yiqSourceImage.height);
-    const significanceResult = significance(yiqSourceImage, flagsImage, options);
-    const diffPixelsResult = diffPixels(yiqSourceImage, yiqOriginalImage, flagsImage, options);
-    const diffGroupsResult = diffGroups(flagsImage, options);
-    const diffStatsResult = diffStats(flagsImage, diffPixelsResult, diffGroupsResult, options);
-    const resultImage = output(sourceImage, originalImage, flagsImage, options);
-    const result = Object.assign({ resultImage }, diffStatsResult, diffPixelsResult, diffGroupsResult, significanceResult);
-    return result;
+    return outputMaps;
 }

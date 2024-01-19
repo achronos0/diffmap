@@ -13,6 +13,11 @@ import {
 import { RgbBitmap, RgbaBitmap } from './types.js'
 
 /**
+ * Return value of {@link diffFile}
+ */
+export type DiffFileResult = Omit<DiffResult, 'outputImages'>
+
+/**
  * Generate image diff from file
  *
  * @param sourceImagePath file path of image to generate diff for
@@ -25,7 +30,7 @@ export async function diffFile (
 	sourceImagePaths: string[],
 	diffOutputPaths: Record<string, string>,
 	options: Omit<DiffOptions, 'output'> = {}
-): Promise<Omit<DiffResult, 'outputImages'>> {
+): Promise<DiffFileResult> {
 	const sourceImages = await Promise.all(sourceImagePaths.map(loadImageFromFile))
 	const finalOptions: DiffOptions = {
 		...options,
@@ -35,10 +40,10 @@ export async function diffFile (
 	for (const [key, path] of Object.entries(diffOutputPaths)) {
 		const image = outputImages[key]
 		if (!image) {
-			throw new Error('diff image not generated')
+			continue
 		}
 		if (!(image instanceof RgbBitmap || image instanceof RgbaBitmap)) {
-			throw new Error('unsupported image type')
+			throw new Error(`unsupported image type for output image: ${key}`)
 		}
 		await saveImageToFile(path, image)
 	}

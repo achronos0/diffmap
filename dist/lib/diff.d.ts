@@ -4,7 +4,7 @@
  * @module
  */
 import { AbsBox } from './box.js';
-import { AnyRgbBitmap, AnyValuemap, IntValuemap, FloatValuemap, YiqFloatmap } from './types.js';
+import { AnyRgbBitmap, AnyValuemap, IntValuemap, FloatValuemap, YiqFloatmap, YiqPixelColor } from './types.js';
 /**
  * Diff flag names
  */
@@ -321,6 +321,9 @@ export interface DiffResult {
             };
         };
     };
+    /**
+     * Pixel counts expressed as percentages (0 to 100)
+     */
     pixelPercent: {
         /**
          * Percentage of all pixels in image that were compared for difference
@@ -338,6 +341,27 @@ export interface DiffResult {
          * Percentage of compared pixels that are different
          */
         diffCompared: number;
+    };
+    /**
+     * Time spent generating diff
+     */
+    timer: {
+        /**
+         * Total time spent on diff, in seconds
+         */
+        total: number;
+        /**
+         * Time spent generating diff flags, in seconds
+         */
+        flags: number;
+        /**
+         * Time spent generating diff groups, in seconds
+         */
+        groups: number;
+        /**
+         * Time spent generating output images, in seconds
+         */
+        render: number;
     };
     /**
      * Diff groups
@@ -419,3 +443,40 @@ export declare function groups(config: {
         group: number;
     };
 };
+/**
+ * Calculate colour distance between two pixels, as a positive number
+ *
+ * @param fromPixel original pixel colour data
+ * @param toPixel changed pixel colour data
+ * @returns colour difference between two pixels, as a positive number
+ */
+export declare function absColorDistance(fromPixel: YiqPixelColor, toPixel: YiqPixelColor): number;
+/**
+ * Calculate similarity flag for pixel
+ *
+ * @param pixels set of pixels to compare
+ * @param changedMinDistance minimum colour distance for a pixel to be considered changed (different), compared to original
+ * @returns similarity flag
+ */
+export declare function similarityFlag(config: {
+    images: YiqFloatmap[];
+    x: number;
+    y: number;
+    changedMinDistance: number;
+}): SimilarityFlagName;
+/**
+ * Calculate significance flag for pixel
+ *
+ * @param config data passed from {@link flags}
+ * @returns significance flag
+ */
+export declare function significanceFlag(config: {
+    images: YiqFloatmap[];
+    x: number;
+    y: number;
+    antialiasMinDistance: number;
+    antialiasMaxDistance: number;
+    backgroundMaxContrast: number;
+    distanceMap: AnyValuemap | null;
+    contrastMap: AnyValuemap | null;
+}): SignificanceFlagName;

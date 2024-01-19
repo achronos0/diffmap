@@ -7,6 +7,7 @@ const diffOptions: diffmap.diff.DiffOptions = {
 	// diffIncludeAntialias: true,
 	// diffIncludeBackground: true
 }
+const repeat = 1
 
 async function main () {
 	const originalImage = `temp_test/inputs/${testNum}a-original.png`
@@ -15,11 +16,41 @@ async function main () {
 	for (const key of diffOutputs) {
 		diffOutputPaths[key] = `temp_test/outputs/${testNum}-${key}.png`
 	}
-	const diffResult = await diffmap.diffFile(
-		[changedImage, originalImage],
-		diffOutputPaths,
-		diffOptions
-	)
-	console.log(diffResult)
+	const timers: {
+		total: number[]
+		flags: number[]
+		groups: number[]
+		render: number[]
+	} = {
+		total: [],
+		flags: [],
+		groups: [],
+		render: [],
+	}
+	for (let i = 0; i < repeat; i++) {
+		const diffResult = await diffmap.diffFile(
+			[changedImage, originalImage],
+			diffOutputPaths,
+			diffOptions
+		)
+		if (i === 0) {
+			console.log(diffResult)
+		}
+		timers.total.push(diffResult.timer.total)
+		timers.flags.push(diffResult.timer.flags)
+		timers.groups.push(diffResult.timer.groups)
+		timers.render.push(diffResult.timer.render)
+	}
+	console.log('Runs:', repeat)
+	for (const key of Object.keys(timers)) {
+		const values = timers[key as keyof typeof timers]
+		const sum = values.reduce((a, b) => a + b, 0)
+		const avg = sum / values.length
+		const min = Math.min(...values)
+		const max = Math.max(...values)
+		console.log(`${key} avg:`, avg)
+		console.log(`${key} min:`, min)
+		console.log(`${key} max:`, max)
+	}
 }
 main().catch(console.error)

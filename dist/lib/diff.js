@@ -94,6 +94,9 @@ export const FLAGS = {
         mask: 0xC0
     }
 };
+/**
+ * Default options for {@link diff}
+ */
 const DEFAULT_OPTIONS = {
     changedMinDistance: 40,
     antialiasMinDistance: 12,
@@ -256,6 +259,16 @@ const DEFAULT_OPTIONS = {
  * @returns diff flags valuemap and diff stats
  */
 export function diff(sourceImages, options = {}) {
+    const times = {
+        totalStart: Date.now(),
+        totalEnd: 0,
+        flagsStart: 0,
+        flagsEnd: 0,
+        groupsStart: 0,
+        groupsEnd: 0,
+        renderStart: 0,
+        renderEnd: 0
+    };
     const { changedMinDistance, antialiasMinDistance, antialiasMaxDistance, backgroundMaxContrast, groupMergeMaxGapSize, groupBorderSize, groupPaddingSize, diffIncludeAntialias, diffIncludeBackground, diffIncludeForeground, mismatchMinPercent, output, outputOptions, outputPrograms } = { ...DEFAULT_OPTIONS, ...options };
     // Validate images and conver to YIQ
     const { length } = sourceImages;
@@ -269,8 +282,10 @@ export function diff(sourceImages, options = {}) {
         }
         return rgbToYiq(image);
     });
-    // Generate similarity and significance flags
+    // Create valuemap to store pixel flags
     const flagsImage = Valuemap.createIntmap(width, height);
+    // Generate similarity and significance flags
+    times.flagsStart = Date.now();
     const { pixelCounts: pixelCountsDiff } = flags({
         flagsImage,
         images: yiqImages,
@@ -282,13 +297,16 @@ export function diff(sourceImages, options = {}) {
         diffIncludeBackground,
         diffIncludeForeground
     });
+    times.flagsEnd = Date.now();
     // Generate diff flags
+    times.groupsStart = Date.now();
     const { diffGroups, pixelCounts: pixelCountGroup } = groups({
         flagsImage,
         groupMergeMaxGapSize,
         groupBorderSize,
         groupPaddingSize
     });
+    times.groupsEnd = Date.now();
     // Assemble pixel counts and percentages
     const pixelCounts = { ...pixelCountsDiff, ...pixelCountGroup };
     const pixelPercent = {
@@ -316,6 +334,7 @@ export function diff(sourceImages, options = {}) {
         }
     }
     // Generate output images
+    times.renderStart = Date.now();
     const { outputImages } = render({
         flagsImage,
         sourceImages,
@@ -323,12 +342,22 @@ export function diff(sourceImages, options = {}) {
         outputOptions,
         outputPrograms
     });
+    times.renderEnd = Date.now();
+    // Assemble timings
+    times.totalEnd = Date.now();
+    const timer = {
+        total: (times.totalEnd - times.totalStart) / 1000,
+        flags: (times.flagsEnd - times.flagsStart) / 1000,
+        groups: (times.groupsEnd - times.groupsStart) / 1000,
+        render: (times.renderEnd - times.renderStart) / 1000
+    };
     return {
+        outputImages,
         diffStatus,
         pixelCounts,
         pixelPercent,
         diffGroups,
-        outputImages
+        timer
     };
 }
 /**
@@ -369,101 +398,22 @@ export function flags(config) {
             }
         }
     };
-    images[0].iterateAll(({ x, y, index, offset }) => {
-        // Get pixels to compare
-        const comparePixels = images.map(image => image.pixel(offset));
-        // Calculate max colour distance between pixels
-        let maxDistance = 0;
-        for (let i = 0; i < comparePixels.length - 1; i++) {
-            for (let j = i + 1; j < comparePixels.length; j++) {
-                const distance = Math.abs(colorDistance(comparePixels[i], comparePixels[j]));
-                if (distance > maxDistance) {
-                    maxDistance = distance;
-                }
-            }
-        }
+    // Iterate all pixels
+    images[0].iterateAll(({ x, y, index }) => {
+        // Calculate similarity flag of pixel (is it identical, similar, or changed)
+        const similarity = similarityFlag({ images, x, y, changedMinDistance });
         // Determine significance flag of pixel (is it antialias, background, or foreground)
         // Run this check for each image, and ensure all images agree on significance
-        let significance = null;
-        for (let imageIndex = 0; imageIndex < images.length; imageIndex++) {
-            const image = images[imageIndex];
-            const sourcePixel = comparePixels[imageIndex];
-            // Compare this pixel to adjacent pixels in its image; calculate max distance and contrast, and count equal pixels
-            let maxDistance = 0;
-            let maxContrast = 0;
-            let countEqual = 0;
-            image.iterateAdjacent(x, y, ({ offset: adjacentOffset }) => {
-                // Get adjacent pixel to compare
-                const adjacentPixel = image.pixel(adjacentOffset);
-                // Calculate colour distance and contrast
-                const pixelDistance = Math.abs(colorDistance(sourcePixel, adjacentPixel));
-                if (!pixelDistance) {
-                    // Pixels are identical
-                    countEqual++;
-                }
-                else {
-                    // Record max distance
-                    if (pixelDistance > maxDistance) {
-                        maxDistance = pixelDistance;
-                    }
-                    // Record max contrast (brightness only difference)
-                    const pixelContrast = Math.abs(contrast(sourcePixel, adjacentPixel));
-                    if (pixelContrast > maxContrast) {
-                        maxContrast = pixelContrast;
-                    }
-                }
-            });
-            // Optionally store distance and contrast to provided maps
-            if (distanceMap) {
-                distanceMap.setPixel(index, maxDistance);
-            }
-            if (contrastMap) {
-                contrastMap.setPixel(index, maxContrast);
-            }
-            // Determine significance of this pixel (is it antialias, background, or foreground)
-            let pixelSignificance;
-            if (countEqual < 3 &&
-                maxDistance >= antialiasMinDistance &&
-                maxDistance <= antialiasMaxDistance &&
-                maxContrast >= antialiasMinDistance &&
-                maxContrast <= antialiasMaxDistance) {
-                // Pixel is antialias:
-                pixelSignificance = 'antialias';
-            }
-            else if (maxContrast <= backgroundMaxContrast) {
-                // Pixel is background
-                pixelSignificance = 'background';
-            }
-            else {
-                // Pixel is foreground
-                pixelSignificance = 'foreground';
-            }
-            // Set overall significance for this pixel across all images
-            if (pixelSignificance === 'foreground' ||
-                (significance && pixelSignificance !== significance)) {
-                // Pixel is foreground OR not all images agree on significance
-                significance = 'foreground';
-                // No need to check other images
-                break;
-            }
-            if (!significance) {
-                significance = pixelSignificance;
-            }
-        }
-        if (!significance) {
-            significance = 'foreground';
-        }
-        // Determine similarity flag for this pixel
-        let similarity;
-        if (!maxDistance) {
-            similarity = 'identical';
-        }
-        else if (maxDistance < changedMinDistance) {
-            similarity = 'similar';
-        }
-        else {
-            similarity = 'changed';
-        }
+        const significance = significanceFlag({
+            images,
+            x,
+            y,
+            distanceMap,
+            contrastMap,
+            antialiasMinDistance,
+            antialiasMaxDistance,
+            backgroundMaxContrast
+        });
         // Determine overall diff status for this pixel
         const compared = ((diffIncludeForeground && significance === 'foreground') ||
             (diffIncludeBackground && significance === 'background') ||
@@ -630,4 +580,130 @@ function render(config) {
         outputImages[outputName] = generateMap(outputName);
     }
     return { outputImages };
+}
+/**
+ * Calculate colour distance between two pixels, as a positive number
+ *
+ * @param fromPixel original pixel colour data
+ * @param toPixel changed pixel colour data
+ * @returns colour difference between two pixels, as a positive number
+ */
+export function absColorDistance(fromPixel, toPixel) {
+    return Math.abs(colorDistance(fromPixel, toPixel));
+}
+/**
+ * Calculate similarity flag for pixel
+ *
+ * @param pixels set of pixels to compare
+ * @param changedMinDistance minimum colour distance for a pixel to be considered changed (different), compared to original
+ * @returns similarity flag
+ */
+export function similarityFlag(config) {
+    const { images, x, y, changedMinDistance } = config;
+    const offset = images[0].offset(x, y);
+    const comparePixels = images.map(image => image.pixel(offset));
+    // Calculate max colour distance between pixels
+    let maxDistance = 0;
+    for (let i = 0; i < comparePixels.length - 1; i++) {
+        for (let j = i + 1; j < comparePixels.length; j++) {
+            const distance = absColorDistance(comparePixels[i], comparePixels[j]);
+            if (distance > maxDistance) {
+                maxDistance = distance;
+            }
+        }
+    }
+    // Determine similarity flag for this pixel
+    let similarity;
+    if (!maxDistance) {
+        similarity = 'identical';
+    }
+    else if (maxDistance < changedMinDistance) {
+        similarity = 'similar';
+    }
+    else {
+        similarity = 'changed';
+    }
+    return similarity;
+}
+/**
+ * Calculate significance flag for pixel
+ *
+ * @param config data passed from {@link flags}
+ * @returns significance flag
+ */
+export function significanceFlag(config) {
+    const { images, x, y, antialiasMinDistance, antialiasMaxDistance, backgroundMaxContrast, distanceMap, contrastMap } = config;
+    const index = images[0].index(x, y);
+    const offset = images[0].offset(x, y);
+    // Check significance of pixel in each source image
+    let significance = null;
+    for (let imageIndex = 0; imageIndex < images.length; imageIndex++) {
+        const image = images[imageIndex];
+        const sourcePixel = image.pixel(offset);
+        // Compare this pixel to adjacent pixels in its image; calculate max distance and contrast, and count equal pixels
+        let maxDistance = 0;
+        let maxContrast = 0;
+        let countEqual = 0;
+        image.iterateAdjacent(x, y, ({ offset: adjacentOffset }) => {
+            // Get adjacent pixel to compare
+            const adjacentPixel = image.pixel(adjacentOffset);
+            // Calculate colour distance and contrast
+            const pixelDistance = absColorDistance(sourcePixel, adjacentPixel);
+            if (!pixelDistance) {
+                // Pixels are identical
+                countEqual++;
+            }
+            else {
+                // Record max distance
+                if (pixelDistance > maxDistance) {
+                    maxDistance = pixelDistance;
+                }
+                // Record max contrast (brightness only difference)
+                const pixelContrast = Math.abs(contrast(sourcePixel, adjacentPixel));
+                if (pixelContrast > maxContrast) {
+                    maxContrast = pixelContrast;
+                }
+            }
+        });
+        // Optionally store distance and contrast to provided maps
+        if (distanceMap) {
+            distanceMap.setPixel(index, maxDistance);
+        }
+        if (contrastMap) {
+            contrastMap.setPixel(index, maxContrast);
+        }
+        // Determine significance of this pixel (is it antialias, background, or foreground)
+        let pixelSignificance;
+        if (countEqual < 3 &&
+            maxDistance >= antialiasMinDistance &&
+            maxDistance <= antialiasMaxDistance &&
+            maxContrast >= antialiasMinDistance &&
+            maxContrast <= antialiasMaxDistance) {
+            // Pixel is antialias:
+            pixelSignificance = 'antialias';
+        }
+        else if (maxContrast <= backgroundMaxContrast) {
+            // Pixel is background
+            pixelSignificance = 'background';
+        }
+        else {
+            // Pixel is foreground
+            pixelSignificance = 'foreground';
+        }
+        // Set overall significance for this pixel across all images
+        if (pixelSignificance === 'foreground' ||
+            (significance && pixelSignificance !== significance)) {
+            // Pixel is foreground OR not all images agree on significance
+            significance = 'foreground';
+            // No need to check other images
+            break;
+        }
+        if (!significance) {
+            significance = pixelSignificance;
+        }
+    }
+    if (!significance) {
+        significance = 'foreground';
+    }
+    return significance;
 }

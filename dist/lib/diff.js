@@ -110,6 +110,7 @@ const DEFAULT_OPTIONS = {
     diffIncludeForeground: true,
     mismatchMinPercent: 50,
     output: ['groups'],
+    outputWhenStatus: ['different', 'mismatch'],
     outputOptions: {},
     outputPrograms: {
         groups: {
@@ -269,8 +270,8 @@ export function diff(sourceImages, options = {}) {
         renderStart: 0,
         renderEnd: 0
     };
-    const { changedMinDistance, antialiasMinDistance, antialiasMaxDistance, backgroundMaxContrast, groupMergeMaxGapSize, groupBorderSize, groupPaddingSize, diffIncludeAntialias, diffIncludeBackground, diffIncludeForeground, mismatchMinPercent, output, outputOptions, outputPrograms } = { ...DEFAULT_OPTIONS, ...options };
-    // Validate images and conver to YIQ
+    const { changedMinDistance, antialiasMinDistance, antialiasMaxDistance, backgroundMaxContrast, groupMergeMaxGapSize, groupBorderSize, groupPaddingSize, diffIncludeAntialias, diffIncludeBackground, diffIncludeForeground, mismatchMinPercent, output, outputWhenStatus, outputOptions, outputPrograms } = { ...DEFAULT_OPTIONS, ...options };
+    // Validate images and convert to YIQ
     const { length } = sourceImages;
     if (length < 2) {
         throw new Error(`diff requires at least 2 images, got ${length}`);
@@ -335,13 +336,17 @@ export function diff(sourceImages, options = {}) {
     }
     // Generate output images
     times.renderStart = Date.now();
-    const { outputImages } = render({
-        flagsImage,
-        sourceImages,
-        output,
-        outputOptions,
-        outputPrograms
-    });
+    let outputImages = {};
+    if (outputWhenStatus.includes(diffStatus)) {
+        ;
+        ({ outputImages } = render({
+            flagsImage,
+            sourceImages,
+            output,
+            outputOptions,
+            outputPrograms
+        }));
+    }
     times.renderEnd = Date.now();
     // Assemble timings
     times.totalEnd = Date.now();
@@ -367,7 +372,7 @@ export function diff(sourceImages, options = {}) {
  * @returns pixel stats
  */
 export function flags(config) {
-    const { flagsImage, images, changedMinDistance, antialiasMinDistance, antialiasMaxDistance, backgroundMaxContrast, diffIncludeAntialias, diffIncludeBackground, diffIncludeForeground, distanceMap = null, contrastMap = null } = config;
+    const { flagsImage, images, changedMinDistance, antialiasMinDistance, antialiasMaxDistance, backgroundMaxContrast, diffIncludeAntialias, diffIncludeBackground, diffIncludeForeground } = config;
     const pixelCounts = {
         all: flagsImage.pixelLength,
         diff: 0,
@@ -408,8 +413,6 @@ export function flags(config) {
             images,
             x,
             y,
-            distanceMap,
-            contrastMap,
             antialiasMinDistance,
             antialiasMaxDistance,
             backgroundMaxContrast
@@ -632,11 +635,10 @@ export function similarityFlag(config) {
  * @returns significance flag
  */
 export function significanceFlag(config) {
-    const { images, x, y, antialiasMinDistance, antialiasMaxDistance, backgroundMaxContrast, distanceMap, contrastMap } = config;
-    const index = images[0].index(x, y);
-    const offset = images[0].offset(x, y);
+    const { images, x, y, antialiasMinDistance, antialiasMaxDistance, backgroundMaxContrast } = config;
     // Check significance of pixel in each source image
     let significance = null;
+    const offset = images[0].offset(x, y);
     for (let imageIndex = 0; imageIndex < images.length; imageIndex++) {
         const image = images[imageIndex];
         const sourcePixel = image.pixel(offset);
@@ -665,13 +667,6 @@ export function significanceFlag(config) {
                 }
             }
         });
-        // Optionally store distance and contrast to provided maps
-        if (distanceMap) {
-            distanceMap.setPixel(index, maxDistance);
-        }
-        if (contrastMap) {
-            contrastMap.setPixel(index, maxContrast);
-        }
         // Determine significance of this pixel (is it antialias, background, or foreground)
         let pixelSignificance;
         if (countEqual < 3 &&

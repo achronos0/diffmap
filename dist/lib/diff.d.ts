@@ -4,7 +4,7 @@
  * @module
  */
 import { AbsBox } from './box.js';
-import { AnyRgbBitmap, AnyValuemap, IntValuemap, FloatValuemap, YiqFloatmap, YiqPixelColor } from './types.js';
+import { AnyRgbBitmap, IntValuemap, FloatValuemap, YiqFloatmap, YiqPixelColor } from './types.js';
 /**
  * Diff flag names
  */
@@ -183,6 +183,14 @@ export interface DiffOptions {
      * Each value is the name of an output program
      */
     output?: string[];
+    /**
+     * Only generate output images when diff status is one of these
+     *
+     * Include `identical` and `similar` to generate output images even when images are not different.
+     *
+     * Default: `['different', 'mismatch']`
+     */
+    outputWhenStatus?: DiffStatus[];
     /**
      * Options for output programs
      */
@@ -392,8 +400,6 @@ export declare function flags(config: {
     diffIncludeAntialias: boolean;
     diffIncludeBackground: boolean;
     diffIncludeForeground: boolean;
-    distanceMap?: AnyValuemap;
-    contrastMap?: AnyValuemap;
 }): {
     pixelCounts: {
         all: number;
@@ -477,6 +483,4 @@ export declare function significanceFlag(config: {
     antialiasMinDistance: number;
     antialiasMaxDistance: number;
     backgroundMaxContrast: number;
-    distanceMap: AnyValuemap | null;
-    contrastMap: AnyValuemap | null;
 }): SignificanceFlagName;

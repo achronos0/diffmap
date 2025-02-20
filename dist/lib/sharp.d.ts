@@ -7,15 +7,18 @@ import sharp from 'sharp';
 import { DiffOptions, DiffResult } from './diff.js';
 import { RgbBitmap, RgbaBitmap } from './types.js';
 /**
+ * Return value of {@link diffFile}
+ */
+export type DiffFileResult = Omit<DiffResult, 'outputImages'>;
+/**
  * Generate image diff from file
  *
- * @param sourceImagePath file path of image to generate diff for
- * @param originalImagePath file path of image to compare against
- * @param diffOutputPath file path to save diff image to
+ * @param sourceImagePaths file path of images to generate diff for
+ * @param diffOutputPaths file paths to save diff images to
  * @param options diff options
  * @returns diff result stats
  */
-export declare function diffFile(sourceImagePaths: string[], diffOutputPaths: Record<string, string>, options?: Omit<DiffOptions, 'output'>): Promise<Omit<DiffResult, 'outputImages'>>;
+export declare function diffFile(sourceImagePaths: string[], diffOutputPaths: Record<string, string>, options?: Omit<DiffOptions, 'output'>): Promise<DiffFileResult>;
 /**
  * Load diffmap image from file using {@link https://www.npmjs.com/package/sharp sharp} library
  *

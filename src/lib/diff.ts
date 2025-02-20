@@ -667,7 +667,7 @@ export function diff (sourceImages: AnyRgbBitmap[], options: DiffOptions = {}): 
 		outputPrograms
 	} = {...DEFAULT_OPTIONS, ...options}
 
-	// Validate images and conver to YIQ
+	// Validate images and convert to YIQ
 	const { length } = sourceImages
 	if (length < 2) {
 		throw new Error(`diff requires at least 2 images, got ${length}`)

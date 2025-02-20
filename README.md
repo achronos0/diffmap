@@ -13,19 +13,21 @@ Image difference calculator
 
 ### Why
 
-Other JS libraries for generating image differences that I could find are ancient, browser-only, and/or not very supported.
+Other JS libraries for generating image differences that I could find are ancient, browser-only, and/or difficult to configure.
 
-Goals:
+Project goals for `diffmap`:
 
 * Universal: runs anywhere, browser or server
-* Stgandalone: no dependencies, no assumptions; does not require `<canvas>`, does not assume any specific image handling library
+* Standalone: no dependencies, no assumptions; does not require `<canvas>`, does not assume any specific image handling library
 * Configurable: everything can be changed to suit your use case
 * Readable: everything can be reasonably understood by reading the source
 * Reusable: everything is structured to allow it to be extended, or decomposed and repurposed
 
-### Prior art
+### Prior art: pixelmatch
 
-Inspired by [`pixelmatch`](https://www.npmjs.com/package/pixelmatch), and fulfils the same purpose, but with added goals of clarity and reusability. Pixelmatch is great but (as of 2023) may be unsupported, is not well documented in its implementation, and can't really be reused without just rewriting it. Which is what `diffmap` does.
+`diffmap` is inspired by [`pixelmatch`](https://www.npmjs.com/package/pixelmatch), and fulfils the same purpose, but with added goals of clarity and reusability. `pixelmatch` is great but is designed to do its job in one way only. It can't easily be configured or decomposed and modified -- it can't really be reused without just rewriting it. Which is what `diffmap` does.
+
+If what `pixelmatch` does it right for you -- use it! If you need more flexibility, that's what `diffmap` is for.
 
 ## Usage
 

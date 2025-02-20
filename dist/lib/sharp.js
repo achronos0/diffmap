@@ -9,9 +9,8 @@ import { RgbBitmap, RgbaBitmap } from './types.js';
 /**
  * Generate image diff from file
  *
- * @param sourceImagePath file path of image to generate diff for
- * @param originalImagePath file path of image to compare against
- * @param diffOutputPath file path to save diff image to
+ * @param sourceImagePaths file path of images to generate diff for
+ * @param diffOutputPaths file paths to save diff images to
  * @param options diff options
  * @returns diff result stats
  */
@@ -25,10 +24,10 @@ export async function diffFile(sourceImagePaths, diffOutputPaths, options = {}) 
     for (const [key, path] of Object.entries(diffOutputPaths)) {
         const image = outputImages[key];
         if (!image) {
-            throw new Error('diff image not generated');
+            continue;
         }
         if (!(image instanceof RgbBitmap || image instanceof RgbaBitmap)) {
-            throw new Error('unsupported image type');
+            throw new Error(`unsupported image type for output image: ${key}`);
         }
         await saveImageToFile(path, image);
     }

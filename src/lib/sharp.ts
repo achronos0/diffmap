@@ -20,9 +20,8 @@ export type DiffFileResult = Omit<DiffResult, 'outputImages'>
 /**
  * Generate image diff from file
  *
- * @param sourceImagePath file path of image to generate diff for
- * @param originalImagePath file path of image to compare against
- * @param diffOutputPath file path to save diff image to
+ * @param sourceImagePaths file path of images to generate diff for
+ * @param diffOutputPaths file paths to save diff images to
  * @param options diff options
  * @returns diff result stats
  */

@@ -285,6 +285,160 @@ export interface DiffOptions {
 }
 
 /**
+ * Default render programs for {@link diff}
+ */
+const DEFAULT_OUTPUT_PROGRAMS: Record<string, RenderProgram> = {
+	groups: {
+		inputs: ['changedFaded', 'flagsDiffGroups', 'flagsDiffPixels'],
+		fn: (maps) => {
+			const { changedFaded, flagsDiffGroups, flagsDiffPixels } = maps
+			const o1 = blend(changedFaded as RgbaBitmap, flagsDiffGroups as RgbaBitmap)
+			return blend(o1, flagsDiffPixels as RgbaBitmap)
+		}
+	},
+	pixels: {
+		inputs: ['changedFaded', 'flagsDiffPixels'],
+		fn: (maps) => {
+			const { changedFaded, flagsDiffPixels } = maps
+			return blend(changedFaded as RgbaBitmap, flagsDiffPixels as RgbaBitmap)
+		}
+	},
+	changedFaded: {
+		options: {
+			fade: 0.5
+		},
+		inputs: ['changed'],
+		fn: (maps, options) => {
+			const { fade } = options
+			return greyscale(maps.changed as RgbaBitmap, { fade })
+		},
+	},
+	flagsDiffPixels: {
+		options: {
+			diffPixelColor: { r: 255, g: 64, b: 0, a: 255 },
+		},
+		inputs: ['flags'],
+		fn: (maps, options) => {
+			const { diffPixelColor } = options
+			return valuesToRgb(maps.flags as IntValuemap, {
+				palette: [
+					{
+						match: {
+							mask: FLAGS.diffDifferent.mask,
+							value: FLAGS.diffDifferent.value
+						},
+						color: diffPixelColor
+					}
+				]
+			})
+		}
+	},
+	flagsDiffGroups: {
+		options: {
+			groupBorderColor: { r: 255, g: 0, b: 0, a: 255 },
+			groupFillColor: { r: 255, g: 0, b: 255, a: 128 }
+		},
+		inputs: ['flags'],
+		fn: (maps, options) => {
+			const {
+				groupBorderColor,
+				groupFillColor
+			} = options
+			return valuesToRgb(maps.flags as IntValuemap, {
+				palette: [
+					{
+						match: {
+							mask: FLAGS.groupBorder.mask,
+							value: FLAGS.groupBorder.value
+						},
+						color: groupBorderColor
+					},
+					{
+						match: {
+							mask: FLAGS.groupFill.mask,
+							value: FLAGS.groupFill.value
+						},
+						color: groupFillColor
+					}
+				]
+			})
+		}
+	},
+	flagsSimilarity: {
+		options: {
+			identicalColor: { r: 0, g: 0, b: 0, a: 255 },
+			similarColor: { r: 128, g: 128, b: 128, a: 255 },
+			changedColor: { r: 255, g: 255, b: 255, a: 255 }
+		},
+		inputs: ['flags'],
+		fn: (maps, options) => {
+			const {
+				identicalColor,
+				similarColor,
+				changedColor
+			} = options
+			return valuesToRgb(maps.flags as IntValuemap, {
+				palette: [
+					{
+						match: {
+							mask: FLAGS.changed.mask,
+							value: FLAGS.changed.value
+						},
+						color: changedColor
+					},
+					{
+						match: {
+							mask: FLAGS.similar.mask,
+							value: FLAGS.similar.value
+						},
+						color: similarColor
+					},
+					{
+						color: identicalColor
+					}
+				]
+			})
+		}
+	},
+	flagsSignificance: {
+		options: {
+			antialiasColor: { r: 0, g: 0, b: 128, a: 255 },
+			backgroundColor: { r: 0, g: 0, b: 0, a: 255 },
+			foregroundColor: { r: 255, g: 255, b: 255, a: 255 }
+		},
+		inputs: ['flags'],
+		fn: (maps, options) => {
+			const {
+				antialiasColor,
+				backgroundColor,
+				foregroundColor
+			} = options
+			return valuesToRgb(maps.flags as IntValuemap, {
+				palette: [
+					{
+						match: {
+							mask: FLAGS.antialias.mask,
+							value: FLAGS.antialias.value
+						},
+						color: antialiasColor
+					},
+					{
+						match: {
+							mask: FLAGS.background.mask,
+							value: FLAGS.background.value
+						},
+						color: backgroundColor
+					},
+					{
+						color: foregroundColor
+					}
+				]
+			})
+		}
+	},
+}
+
+/**
  * Default options for {@link diff}
  */
 const DEFAULT_OPTIONS: Required<DiffOptions> = {
@@ -302,156 +456,7 @@ const DEFAULT_OPTIONS: Required<DiffOptions> = {
 	output: ['groups'],
 	outputWhenStatus: ['different', 'mismatch'],
 	outputOptions: {},
-	outputPrograms: {
-		groups: {
-			inputs: ['changedFaded', 'flagsDiffGroups', 'flagsDiffPixels'],
-			fn: (maps) => {
-				const { changedFaded, flagsDiffGroups, flagsDiffPixels } = maps
-				const o1 = blend(changedFaded as RgbaBitmap, flagsDiffGroups as RgbaBitmap)
-				return blend(o1, flagsDiffPixels as RgbaBitmap)
-			}
-		},
-		pixels: {
-			inputs: ['changedFaded', 'flagsDiffPixels'],
-			fn: (maps) => {
-				const { changedFaded, flagsDiffPixels } = maps
-				return blend(changedFaded as RgbaBitmap, flagsDiffPixels as RgbaBitmap)
-			}
-		},
-		changedFaded: {
-			options: {
-				fade: 0.5
-			},
-			inputs: ['changed'],
-			fn: (maps, options) => {
-				const { fade } = options
-				return greyscale(maps.changed as RgbaBitmap, { fade })
-			},
-		},
-		flagsDiffPixels: {
-			options: {
-				diffPixelColor: { r: 255, g: 64, b: 0, a: 255 },
-			},
-			inputs: ['flags'],
-			fn: (maps, options) => {
-				const { diffPixelColor } = options
-				return valuesToRgb(maps.flags as IntValuemap, {
-					palette: [
-						{
-							match: {
-								mask: FLAGS.diffDifferent.mask,
-								value: FLAGS.diffDifferent.value
-							},
-							color: diffPixelColor
-						}
-					]
-				})
-			}
-		},
-		flagsDiffGroups: {
-			options: {
-				groupBorderColor: { r: 255, g: 0, b: 0, a: 255 },
-				groupFillColor: { r: 255, g: 0, b: 255, a: 128 }
-			},
-			inputs: ['flags'],
-			fn: (maps, options) => {
-				const {
-					groupBorderColor,
-					groupFillColor
-				} = options
-				return valuesToRgb(maps.flags as IntValuemap, {
-					palette: [
-						{
-							match: {
-								mask: FLAGS.groupBorder.mask,
-								value: FLAGS.groupBorder.value
-							},
-							color: groupBorderColor
-						},
-						{
-							match: {
-								mask: FLAGS.groupFill.mask,
-								value: FLAGS.groupFill.value
-							},
-							color: groupFillColor
-						}
-					]
-				})
-			}
-		},
-		flagsSimilarity: {
-			options: {
-				identicalColor: { r: 0, g: 0, b: 0, a: 255 },
-				similarColor: { r: 128, g: 128, b: 128, a: 255 },
-				changedColor: { r: 255, g: 255, b: 255, a: 255 }
-			},
-			inputs: ['flags'],
-			fn: (maps, options) => {
-				const {
-					identicalColor,
-					similarColor,
-					changedColor
-				} = options
-				return valuesToRgb(maps.flags as IntValuemap, {
-					palette: [
-						{
-							match: {
-								mask: FLAGS.changed.mask,
-								value: FLAGS.changed.value
-							},
-							color: changedColor
-						},
-						{
-							match: {
-								mask: FLAGS.similar.mask,
-								value: FLAGS.similar.value
-							},
-							color: similarColor
-						},
-						{
-							color: identicalColor
-						}
-					]
-				})
-			}
-		},
-		flagsSignificance: {
-			options: {
-				antialiasColor: { r: 0, g: 0, b: 128, a: 255 },
-				backgroundColor: { r: 0, g: 0, b: 0, a: 255 },
-				foregroundColor: { r: 255, g: 255, b: 255, a: 255 }
-			},
-			inputs: ['flags'],
-			fn: (maps, options) => {
-				const {
-					antialiasColor,
-					backgroundColor,
-					foregroundColor
-				} = options
-				return valuesToRgb(maps.flags as IntValuemap, {
-					palette: [
-						{
-							match: {
-								mask: FLAGS.antialias.mask,
-								value: FLAGS.antialias.value
-							},
-							color: antialiasColor
-						},
-						{
-							match: {
-								mask: FLAGS.background.mask,
-								value: FLAGS.background.value
-							},
-							color: backgroundColor
-						},
-						{
-							color: foregroundColor
-						}
-					]
-				})
-			}
-		},
-	}
+	outputPrograms: DEFAULT_OUTPUT_PROGRAMS,
 }
 
 /**

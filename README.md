@@ -2,6 +2,32 @@
 
 Image difference calculator
 
+## Usage
+
+### Install
+
+`npm install diffmap`
+
+### Use in browser (with a builder e.g. webpack)
+
+TODO
+
+### Use in Node.js with Sharp
+
+Note, you will need to install Sharp: `npm install sharp`
+
+```js
+import diffFile from 'diffmap/sharp.js'
+
+const inputPath1 = 'path/to/image1.png'
+const inputPath2 = 'path/to/image2.png'
+const outputPaths = {
+  groups: 'path/to/diff-image.png'
+}
+
+const diffResult = async diffFile([inputPath1, inputPath2], outputPaths)
+```
+
 ## Overview
 
 ### What
@@ -13,7 +39,7 @@ Image difference calculator
 
 ### Why
 
-Other JS libraries for generating image differences that I could find are ancient, browser-only, and/or difficult to configure.
+Other JS libraries for generating image differences that I could find are ancient, browser-only, and/or not very configurable.
 
 Project goals for `diffmap`:
 
@@ -29,15 +55,12 @@ Project goals for `diffmap`:
 
 If what `pixelmatch` does it right for you -- use it! If you need more flexibility, that's what `diffmap` is for.
 
-## Usage
-
-TBD
-
 ## Dev plan
 
-* write all basic functionality
-* create unit tests
-* write core helpers
-* write sharp helpers
-* write basic cli tool
-* create integration tests
+* [x] write all basic functionality
+* [x] write core helpers
+* [x] write sharp helpers
+* [ ] write browser helpers
+* [ ] create unit tests
+* [ ] write basic cli tool
+* [ ] create integration tests

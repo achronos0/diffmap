@@ -12,6 +12,7 @@ import {
 import {
 	blend,
 	greyscale,
+	setAlpha,
 	yiq as rgbToYiq
 } from './image-rgb.js'
 import {
@@ -25,6 +26,7 @@ import {
 	AnyRgbBitmap,
 	IntValuemap,
 	FloatValuemap,
+	RgbBitmap,
 	RgbaBitmap,
 	Valuemap,
 	YiqFloatmap,
@@ -296,11 +298,25 @@ const DEFAULT_OUTPUT_PROGRAMS: Record<string, RenderProgram> = {
 			return blend(o1, flagsDiffPixels as RgbaBitmap)
 		}
 	},
+	groupsRgba: {
+		inputs: ['groups'],
+		fn: (maps) => {
+			const { groups } = maps
+			return setAlpha(groups as RgbBitmap, { alpha: 255 })
+		}
+	},
 	pixels: {
 		inputs: ['changedFaded', 'flagsDiffPixels'],
 		fn: (maps) => {
 			const { changedFaded, flagsDiffPixels } = maps
 			return blend(changedFaded as RgbaBitmap, flagsDiffPixels as RgbaBitmap)
+		}
+	},
+	pixelsRgba: {
+		inputs: ['pixels'],
+		fn: (maps) => {
+			const { pixels } = maps
+			return setAlpha(pixels as RgbBitmap, { alpha: 255 })
 		}
 	},
 	changedFaded: {

@@ -77,6 +77,38 @@ export function flatten (sourceImage: RgbaBitmap, options: FlattenOptions = {}):
 }
 
 /**
+ * Options for {@link setAlpha}
+ */
+export interface SetAlphaOptions {
+	/**
+	 * Alpha channel value
+	 *
+	 * Range: `0` to `255`
+	 *
+	 * Default: `255`
+	 */
+	alpha?: number
+}
+
+/**
+ *
+ * @param sourceImage image to convert to RGBA
+ * @param options conversion options
+ * @returns RGBA image with alpha channel set
+ */
+export function setAlpha (sourceImage: RgbBitmap, options: SetAlphaOptions = {}): RgbaBitmap {
+	const { alpha = 255 } = options
+	const resultImage = RgbaBitmap.create(sourceImage.width, sourceImage.height)
+	sourceImage.iterateAll(({ index, offset }) => {
+		const sourcePixel = sourceImage.pixel(offset)
+		const resultPixel = { ...sourcePixel, a: alpha }
+		const resultOffset = resultImage.offsetFromIndex(index)
+		resultImage.setPixel(resultOffset, resultPixel)
+	})
+	return resultImage
+}
+
+/**
  * Options for {@link brightness}
  */
 export interface BrightnessOptions {

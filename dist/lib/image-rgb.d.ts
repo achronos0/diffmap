@@ -33,6 +33,26 @@ export interface FlattenOptions {
  */
 export declare function flatten(sourceImage: RgbaBitmap, options?: FlattenOptions): RgbBitmap;
 /**
+ * Options for {@link setAlpha}
+ */
+export interface SetAlphaOptions {
+    /**
+     * Alpha channel value
+     *
+     * Range: `0` to `255`
+     *
+     * Default: `255`
+     */
+    alpha?: number;
+}
+/**
+ *
+ * @param sourceImage image to convert to RGBA
+ * @param options conversion options
+ * @returns RGBA image with alpha channel set
+ */
+export declare function setAlpha(sourceImage: RgbBitmap, options?: SetAlphaOptions): RgbaBitmap;
+/**
  * Options for {@link brightness}
  */
 export interface BrightnessOptions {

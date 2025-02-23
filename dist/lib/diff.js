@@ -4,7 +4,7 @@
  * @module
  */
 import { boxIntersect, fitBox } from './box.js';
-import { blend, greyscale, yiq as rgbToYiq } from './image-rgb.js';
+import { blend, greyscale, setAlpha, yiq as rgbToYiq } from './image-rgb.js';
 import { rgb as valuesToRgb } from './image-value.js';
 import { colorDistance, contrast } from './pixel-yiq.js';
 import { Valuemap } from './types.js';
@@ -106,11 +106,25 @@ const DEFAULT_OUTPUT_PROGRAMS = {
             return blend(o1, flagsDiffPixels);
         }
     },
+    groupsRgba: {
+        inputs: ['groups'],
+        fn: (maps) => {
+            const { groups } = maps;
+            return setAlpha(groups, { alpha: 255 });
+        }
+    },
     pixels: {
         inputs: ['changedFaded', 'flagsDiffPixels'],
         fn: (maps) => {
             const { changedFaded, flagsDiffPixels } = maps;
             return blend(changedFaded, flagsDiffPixels);
+        }
+    },
+    pixelsRgba: {
+        inputs: ['pixels'],
+        fn: (maps) => {
+            const { pixels } = maps;
+            return setAlpha(pixels, { alpha: 255 });
         }
     },
     changedFaded: {

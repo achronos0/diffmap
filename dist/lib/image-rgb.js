@@ -5,7 +5,7 @@
  */
 import { rgb as valuesToRgb } from './image-value.js';
 import { blend as blendPixel, flatten as flattenPixel, greyscale as greyscalePixel, yiq as yiqPixel } from './pixel-rgb.js';
-import { RgbBitmap, Valuemap, YiqFloatmap } from './types.js';
+import { RgbBitmap, RgbaBitmap, Valuemap, YiqFloatmap } from './types.js';
 /**
  * Generate a YIQ (NTSC luminance/chrominance) image from a RGB/RGBA image
  *
@@ -39,6 +39,23 @@ export function flatten(sourceImage, options = {}) {
     sourceImage.iterateAll(({ index, offset }) => {
         const sourcePixel = sourceImage.pixel(offset);
         const resultPixel = flattenPixel(sourcePixel, alphaRatio);
+        const resultOffset = resultImage.offsetFromIndex(index);
+        resultImage.setPixel(resultOffset, resultPixel);
+    });
+    return resultImage;
+}
+/**
+ *
+ * @param sourceImage image to convert to RGBA
+ * @param options conversion options
+ * @returns RGBA image with alpha channel set
+ */
+export function setAlpha(sourceImage, options = {}) {
+    const { alpha = 255 } = options;
+    const resultImage = RgbaBitmap.create(sourceImage.width, sourceImage.height);
+    sourceImage.iterateAll(({ index, offset }) => {
+        const sourcePixel = sourceImage.pixel(offset);
+        const resultPixel = { ...sourcePixel, a: alpha };
         const resultOffset = resultImage.offsetFromIndex(index);
         resultImage.setPixel(resultOffset, resultPixel);
     });

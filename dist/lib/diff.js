@@ -95,9 +95,25 @@ export const FLAGS = {
     }
 };
 /**
+ * Suggested colour distance for text - `changedMinDistance` option for {@link diff}
+ */
+export const CHANGED_MIN_DISTANCE_TEXT = 40;
+/**
+ * Suggested colour distance for general media - `changedMinDistance` option for {@link diff}
+ */
+export const CHANGED_MIN_DISTANCE_GENERAL = 9;
+/**
+ * Default `outputWhenStatus` option for {@link diff}
+ */
+export const DIFF_STATUS_DIFFERENT = ['different', 'mismatch'];
+/**
+ * All possible `outputWhenStatus` options for {@link diff}
+ */
+export const DIFF_STATUS_ALL = ['identical', 'similar', 'different', 'mismatch'];
+/**
  * Default render programs for {@link diff}
  */
-const DEFAULT_OUTPUT_PROGRAMS = {
+export const DEFAULT_OUTPUT_PROGRAMS = {
     groups: {
         inputs: ['changedFaded', 'flagsDiffGroups', 'flagsDiffPixels'],
         fn: (maps) => {
@@ -253,8 +269,8 @@ const DEFAULT_OUTPUT_PROGRAMS = {
 /**
  * Default options for {@link diff}
  */
-const DEFAULT_OPTIONS = {
-    changedMinDistance: 40,
+export const DEFAULT_OPTIONS = {
+    changedMinDistance: CHANGED_MIN_DISTANCE_GENERAL,
     antialiasMinDistance: 12,
     antialiasMaxDistance: 150,
     backgroundMaxContrast: 25,
@@ -266,7 +282,7 @@ const DEFAULT_OPTIONS = {
     diffIncludeForeground: true,
     mismatchMinPercent: 50,
     output: ['groups'],
-    outputWhenStatus: ['different', 'mismatch'],
+    outputWhenStatus: DIFF_STATUS_DIFFERENT,
     outputOptions: {},
     outputPrograms: DEFAULT_OUTPUT_PROGRAMS,
 };

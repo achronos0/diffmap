@@ -93,7 +93,8 @@ export interface DiffOptions {
      *
      * Range: `0` to `255`
      *
-     * Default: `40`
+     * Default: `9`
+     * Suggested for text: `40`
      */
     changedMinDistance?: number;
     /**
@@ -202,6 +203,30 @@ export interface DiffOptions {
      */
     outputPrograms?: Record<string, RenderProgram>;
 }
+/**
+ * Suggested colour distance for text - `changedMinDistance` option for {@link diff}
+ */
+export declare const CHANGED_MIN_DISTANCE_TEXT = 40;
+/**
+ * Suggested colour distance for general media - `changedMinDistance` option for {@link diff}
+ */
+export declare const CHANGED_MIN_DISTANCE_GENERAL = 9;
+/**
+ * Default `outputWhenStatus` option for {@link diff}
+ */
+export declare const DIFF_STATUS_DIFFERENT: DiffStatus[];
+/**
+ * All possible `outputWhenStatus` options for {@link diff}
+ */
+export declare const DIFF_STATUS_ALL: DiffStatus[];
+/**
+ * Default render programs for {@link diff}
+ */
+export declare const DEFAULT_OUTPUT_PROGRAMS: Record<string, RenderProgram>;
+/**
+ * Default options for {@link diff}
+ */
+export declare const DEFAULT_OPTIONS: Required<DiffOptions>;
 /**
  * Overall result of diff comparison
  */

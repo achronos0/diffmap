@@ -1,7 +1,7 @@
 
 import * as diffmap from '../src/sharp.js'
 
-const TEST_COUNT = 3
+const TEST_COUNT = 4
 const REPEAT_COUNT = 1
 const DIFF_OUTPUTS: string[] = ['pixels', 'groups', 'flagsDiffGroups', 'flagsDiffPixels', 'flagsSimilarity', 'flagsSignificance']
 const DIFF_OPTIONS: diffmap.diff.DiffOptions = {

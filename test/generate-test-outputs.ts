@@ -5,6 +5,7 @@ const TEST_COUNT = 4
 const REPEAT_COUNT = 1
 const DIFF_OUTPUTS: string[] = ['pixels', 'groups', 'flagsDiffGroups', 'flagsDiffPixels', 'flagsSimilarity', 'flagsSignificance']
 const DIFF_OPTIONS: diffmap.diff.DiffOptions = {
+	changedMinDistance: 15,
 	outputWhenStatus: diffmap.diff.DIFF_STATUS_ALL,
 }
 

@@ -208,9 +208,13 @@ export interface DiffOptions {
  */
 export declare const CHANGED_MIN_DISTANCE_TEXT = 40;
 /**
- * Suggested colour distance for general media - `changedMinDistance` option for {@link diff}
+ * Suggested colour distance for general mixed media - `changedMinDistance` option for {@link diff}
  */
-export declare const CHANGED_MIN_DISTANCE_GENERAL = 9;
+export declare const CHANGED_MIN_DISTANCE_GENERAL = 15;
+/**
+ * Suggested colour distance for photos - `changedMinDistance` option for {@link diff}
+ */
+export declare const CHANGED_MIN_DISTANCE_PHOTO = 9;
 /**
  * Default `outputWhenStatus` option for {@link diff}
  */

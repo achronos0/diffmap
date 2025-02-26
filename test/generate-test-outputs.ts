@@ -1,10 +1,12 @@
 
 import * as diffmap from '../src/sharp.js'
 
-const TEST_COUNT = 1
+const TEST_COUNT = 3
 const REPEAT_COUNT = 1
 const DIFF_OUTPUTS: string[] = ['pixels', 'groups', 'flagsDiffGroups', 'flagsDiffPixels', 'flagsSimilarity', 'flagsSignificance']
-const DIFF_OPTIONS: diffmap.diff.DiffOptions = {}
+const DIFF_OPTIONS: diffmap.diff.DiffOptions = {
+	outputWhenStatus: diffmap.diff.DIFF_STATUS_ALL,
+}
 
 async function main () {
 	for (let testNum = 1; testNum <= TEST_COUNT; testNum++) {

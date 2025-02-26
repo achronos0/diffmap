@@ -1,6 +1,6 @@
 {
 	"name": "diffmap",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "Image difference calculator",
 	"module": "dist/index.js",
 	"type": "module",

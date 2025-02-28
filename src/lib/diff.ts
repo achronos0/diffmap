@@ -761,7 +761,7 @@ export function diff (sourceImages: AnyRgbBitmap[], options: DiffOptions = {}): 
 		compared: 100 * pixelCounts.compared / pixelCounts.all,
 		diff: 100 * pixelCounts.diff / pixelCounts.all,
 		group: 100 * pixelCounts.group / pixelCounts.all,
-		diffCompared: 100 * pixelCounts.diff / pixelCounts.compared
+		diffCompared: pixelCounts.compared ? 100 * pixelCounts.diff / pixelCounts.compared : 0
 	}
 
 	// Determine overall diff status
